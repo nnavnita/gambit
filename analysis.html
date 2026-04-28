@@ -160,6 +160,7 @@
     gap: 8px;
     font-size: 0.85rem;
     width: 400px;
+    max-width: 100%;
   }
   .player-name { font-weight: 600; }
   .player-rating { color: #888; font-size: 0.75rem; }
@@ -227,11 +228,17 @@
   .sq.annotated::after {
     content: attr(data-ann);
     position: absolute;
-    bottom: 1px; right: 2px;
-    font-size: 10px;
-    font-weight: 700;
+    bottom: 2px; right: 3px;
+    font-size: 13px;
+    font-weight: 900;
     line-height: 1;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.6);
+    z-index: 2;
   }
+  .sq.sq-ann-blunder::after    { color: #ff4444; }
+  .sq.sq-ann-mistake::after    { color: #ffaa00; }
+  .sq.sq-ann-inaccuracy::after { color: #aaaaff; }
+  .sq.sq-ann-best::after       { color: #44dd44; }
   .sq img { width: 82%; height: 82%; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
 
   /* ── Move list panel ── */
@@ -478,34 +485,72 @@
 
   /* ── Mobile layout ── */
   @media (max-width: 768px) {
-    #main { flex-direction: column; overflow-y: auto; overflow-x: hidden; }
+    /* Let body scroll instead of clipping */
+    body { height: auto; min-height: 100vh; overflow-y: auto; overflow-x: hidden; }
+
+    #main { flex-direction: column; overflow: visible; height: auto; flex: none; }
+
+    /* Game list: full width, limited height, collapsible */
     #game-list {
       width: 100%; min-width: unset;
       border-right: none; border-bottom: 1px solid #2a2a4a;
-      max-height: 55vh; flex-shrink: 0;
+      max-height: 50vh; flex-shrink: 0;
     }
     #game-list.collapsed { display: none; }
-    #analysis-area { flex-direction: column; overflow-y: auto; overflow-x: hidden; }
-    #board-section { padding: 12px; align-items: flex-start; width: 100%; }
-    #back-btn-mobile { display: flex; }
-    #board {
-      grid-template-columns: repeat(8, 42px) !important;
-      grid-template-rows: repeat(8, 42px) !important;
+
+    /* Analysis area stacks vertically */
+    #analysis-area { flex-direction: column; overflow: visible; }
+
+    /* Board section: centered, full width */
+    #board-section {
+      padding: 8px;
+      align-items: center;
+      width: 100%;
     }
-    .sq { width: 42px !important; height: 42px !important; }
-    #eval-bar-wrap { height: 336px !important; }
-    #player-bar, #player-bar-bottom { width: 100% !important; max-width: 356px; }
+
+    #back-btn-mobile { display: flex; }
+
+    /* Scale board to fit screen: 40px squares */
+    #board {
+      grid-template-columns: repeat(8, 40px) !important;
+      grid-template-rows: repeat(8, 40px) !important;
+    }
+    .sq { width: 40px !important; height: 40px !important; }
+
+    /* Eval bar matches board height */
+    #eval-bar-wrap { height: 320px !important; }
+
+    /* Player bars full width */
+    #player-bar, #player-bar-bottom { width: 100% !important; max-width: 100%; }
+
+    /* Hide coord labels to save space */
     #coord-files, #coord-files-b, #coord-ranks { display: none !important; }
+
+    /* Move panel: full width, natural height */
     #move-panel {
       width: 100%; min-width: unset;
       border-left: none; border-top: 1px solid #2a2a4a;
-      max-height: 45vh; flex-shrink: 0;
+      max-height: none;
+      flex-shrink: 0;
     }
-    #input-bar { flex-wrap: wrap; }
+    /* Limit move scroll height so summary stays visible */
+    #move-scroll { max-height: 35vh; }
+
+    /* Accuracy numbers slightly smaller */
+    .acc-pct { font-size: 1.05rem !important; }
+
+    /* Nav buttons row — don't overflow */
+    #nav-buttons { justify-content: center; width: 100%; }
+
+    /* Input bar */
+    #input-bar { flex-wrap: wrap; gap: 6px; }
     input#username { width: 100%; }
+
+    /* Header */
     nav { gap: 4px; }
-    nav a { padding: 6px 10px; font-size: 0.8rem; }
+    nav a { padding: 5px 8px; font-size: 0.78rem; }
     header h1 { font-size: 1rem; }
+    header img { height: 22px; width: 22px; }
   }
 </style>
 </head>
@@ -575,6 +620,7 @@ const ANALYSIS_DEPTH = 4;
 let currentGame = null;      // { fens, moves, evals, annotations, header }
 let currentMoveIdx = 0;      // which position we're viewing (0 = start)
 let analysisUsername = '';
+let currentAnalysisId = 0;   // incremented each time a new game is loaded
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 populateDateSelectors();
@@ -697,22 +743,28 @@ async function loadGame(gameData, username) {
   setEvalBar(0);
 
   // Run analysis
-  await analyseGame(fens, moves, isWhite);
+  const myId = ++currentAnalysisId;
+  await analyseGame(fens, moves, isWhite, myId);
 }
 
-async function analyseGame(fens, moves, isWhite) {
+async function analyseGame(fens, moves, isWhite, analysisId) {
   const progressWrap = document.getElementById('progress-wrap');
   const progressText = document.getElementById('progress-text');
   const progressFill = document.getElementById('progress-bar-fill');
+  if (!progressWrap) return;
   progressWrap.classList.add('visible');
 
   const evals = [];
   const bestMoves = [];
   for (let i = 0; i < fens.length; i++) {
+    if (analysisId !== currentAnalysisId) return; // cancelled — new game selected
+
     progressText.textContent = `Analysing position ${i} / ${fens.length - 1}…`;
     progressFill.style.width = `${(i / (fens.length - 1)) * 100}%`;
 
     const { score, bestMove } = await getEval(fens[i]);
+    if (analysisId !== currentAnalysisId) return; // cancelled after await
+
     evals.push(score);
     bestMoves.push(bestMove);
     currentGame.evals = evals;
@@ -936,7 +988,7 @@ function showAnalysisUI() {
             <div id="coord-ranks" style="display:flex;flex-direction:column;justify-content:space-around;width:14px;font-size:0.6rem;color:#666;text-align:center"></div>
             <div style="position:relative;display:inline-block;">
               <div id="board"></div>
-              <svg id="board-arrows" style="position:absolute;top:0;left:0;width:400px;height:400px;pointer-events:none;"></svg>
+              <svg id="board-arrows" viewBox="0 0 400 400" preserveAspectRatio="none" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"></svg>
             </div>
           </div>
           <div style="display:flex;gap:4px;margin-top:4px;" id="coord-files-b"></div>
@@ -1079,9 +1131,9 @@ function goToMove(idx) {
 function renderBoard(fen, lastMove, ann) {
   const boardEl = document.getElementById('board');
   if (!boardEl) return;
-  boardEl.innerHTML = '';
   const chess = new Chess();
   try { chess.load(fen); } catch(e) { return; }
+  boardEl.innerHTML = '';
 
   for (let visualRow = 0; visualRow < 8; visualRow++) {
     for (let visualCol = 0; visualCol < 8; visualCol++) {
@@ -1094,7 +1146,12 @@ function renderBoard(fen, lastMove, ann) {
 
       if (lastMove && (sq === lastMove.from || sq === lastMove.to)) {
         if (ann && sq === lastMove.to) {
-          div.classList.add(ann.sqCls);
+          if (ann.sqCls) div.classList.add(ann.sqCls);
+          else div.classList.add('last-move');
+          // Annotation symbol overlay
+          const sqClass = ann === ANN_BLUNDER ? 'sq-ann-blunder' : ann === ANN_MISTAKE ? 'sq-ann-mistake' : ann === ANN_INACCURACY ? 'sq-ann-inaccuracy' : 'sq-ann-best';
+          div.classList.add('annotated', sqClass);
+          div.dataset.ann = ann.label;
         } else {
           div.classList.add('last-move');
         }
