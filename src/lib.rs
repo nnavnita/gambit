@@ -43,6 +43,16 @@ impl Engine {
         mv.to_uci()
     }
 
+    /// Evaluate position in centipawns from white's perspective.
+    pub fn eval_position(&mut self, fen: &str, depth: u32) -> i32 {
+        let board = Board::from_fen(fen);
+        self.searcher.clear_for_search();
+        let mut info = SearchInfo::new_depth(depth);
+        let (_, score) = self.searcher.search(&board, &mut info);
+        // score is from side-to-move's perspective; convert to white perspective
+        if board.side == crate::types::Color::White { score } else { -score }
+    }
+
     /// All legal moves for given FEN as comma-separated UCI strings.
     pub fn legal_moves_for(&self, fen: &str) -> String {
         let board = Board::from_fen(fen);
