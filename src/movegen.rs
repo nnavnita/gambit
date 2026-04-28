@@ -101,8 +101,8 @@ fn slide_ray(sq: usize, dir: i32, occ: Bitboard) -> Bitboard {
         let f = (s % 8) as i32;
         // Prevent file wrapping for horizontal/diagonal moves
         match dir {
-             1 | 9 | -7 => { if f == 0 { result |= 1u64 << s; break; } }
-            -1 | -9 | 7 => { if f == 7 { result |= 1u64 << s; break; } }
+             1 | 9 | -7 => { if f == 0 { break; } }
+            -1 | -9 | 7 => { if f == 7 { break; } }
             _ => {}
         }
         result |= 1u64 << s;
