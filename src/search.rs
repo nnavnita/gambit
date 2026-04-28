@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use crate::types::*;
 use crate::board::Board;
 use crate::movegen::{legal_moves, in_check};
-use crate::eval::{evaluate, mvv_lva, INF, MATE_SCORE};
+use crate::eval::{evaluate, is_endgame, mvv_lva, INF, MATE_SCORE};
 use crate::tt::{TranspositionTable, TTFlag};
 
 pub struct SearchInfo {
@@ -81,7 +81,22 @@ impl Searcher {
 
         for depth in 1..=info.max_depth {
             info.depth = depth;
-            let score = self.alpha_beta(board, -INF, INF, depth as i32, 0, info);
+            let score = if depth >= 4 && best_score.abs() < MATE_SCORE / 2 {
+                // Aspiration window search
+                let window = 50i32;
+                let lo = best_score - window;
+                let hi = best_score + window;
+                let s = self.alpha_beta(board, lo, hi, depth as i32, 0, true, info);
+                if info.stop { break; }
+                if s <= lo || s >= hi {
+                    // Failed outside window — full re-search
+                    self.alpha_beta(board, -INF, INF, depth as i32, 0, true, info)
+                } else {
+                    s
+                }
+            } else {
+                self.alpha_beta(board, -INF, INF, depth as i32, 0, true, info)
+            };
             if info.stop { break; }
             best_score = score;
             // Retrieve best move from TT
@@ -113,6 +128,7 @@ impl Searcher {
         beta: i32,
         depth: i32,
         ply: usize,
+        null_allowed: bool,
         info: &mut SearchInfo,
     ) -> i32 {
         info.check_time();
@@ -139,9 +155,29 @@ impl Searcher {
             return self.quiescence(board, alpha, beta, 0, info);
         }
 
+        let in_chk = in_check(board);
+
+        // Null move pruning
+        if null_allowed && depth >= 3 && !in_chk && !is_endgame(board) {
+            let null_board = board.make_null_move();
+            let null_score = -self.alpha_beta(&null_board, -beta, -beta + 1, depth - 3, ply + 1, false, info);
+            if !info.stop && null_score >= beta {
+                return beta;
+            }
+        }
+
+        // Futility pruning (near-leaf, non-check positions)
+        if !in_chk && depth <= 2 {
+            let static_eval = evaluate(board);
+            let margin = if depth == 1 { 200 } else { 400 };
+            if static_eval + margin <= alpha {
+                return self.quiescence(board, alpha, beta, 0, info);
+            }
+        }
+
         let mut moves = legal_moves(board);
         if moves.is_empty() {
-            return if in_check(board) {
+            return if in_chk {
                 -MATE_SCORE + ply as i32  // checkmate (prefer faster mates)
             } else {
                 0  // stalemate
@@ -159,13 +195,13 @@ impl Searcher {
             let child = board.make_move(mv);
 
             let score = if i == 0 {
-                -self.alpha_beta(&child, -beta, -alpha, depth - 1, ply + 1, info)
+                -self.alpha_beta(&child, -beta, -alpha, depth - 1, ply + 1, true, info)
             } else {
                 // Late Move Reduction
-                let reduction = if depth >= 3 && i >= 4 && !in_check(board) { 1 } else { 0 };
-                let score = -self.alpha_beta(&child, -alpha - 1, -alpha, depth - 1 - reduction, ply + 1, info);
+                let reduction = if depth >= 3 && i >= 4 && !in_chk { 1 } else { 0 };
+                let score = -self.alpha_beta(&child, -alpha - 1, -alpha, depth - 1 - reduction, ply + 1, true, info);
                 if score > alpha && score < beta {
-                    -self.alpha_beta(&child, -beta, -alpha, depth - 1, ply + 1, info)
+                    -self.alpha_beta(&child, -beta, -alpha, depth - 1, ply + 1, true, info)
                 } else {
                     score
                 }

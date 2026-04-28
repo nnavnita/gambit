@@ -171,6 +171,20 @@ impl Board {
         None
     }
 
+    /// Pass move (null move) — flips side, clears ep. Used by null-move pruning.
+    pub fn make_null_move(&self) -> Board {
+        let mut b = self.clone();
+        let z = zobrist();
+        if b.ep_sq != 255 {
+            b.zobrist ^= z.ep[(b.ep_sq % 8) as usize];
+            b.ep_sq = 255;
+        }
+        b.halfmove += 1;
+        b.side = b.side.flip();
+        b.zobrist ^= z.side;
+        b
+    }
+
     pub fn make_move(&self, mv: Move) -> Board {
         let mut b = self.clone();
         let z = zobrist();

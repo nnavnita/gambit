@@ -1,5 +1,8 @@
 use crate::types::*;
 use crate::board::Board;
+use crate::movegen::{bishop_attacks, rook_attacks};
+
+const FILE_A: u64 = 0x0101010101010101;
 
 pub const INF: i32 = 1_000_000;
 pub const MATE_SCORE: i32 = 900_000;
@@ -98,14 +101,141 @@ pub fn evaluate(board: &Board) -> i32 {
             let mut bb = board.pieces[c][p];
             while bb != 0 {
                 let sq = bb.trailing_zeros() as usize;
-                // Mirror sq for black (so PST is always from white's view)
                 let pst_sq = if c == 0 { sq } else { sq ^ 56 };
                 score += sign * (PIECE_VALUE[p] + PST[p][pst_sq]);
                 bb &= bb - 1;
             }
         }
+        score += sign * pawn_structure(board, c);
+        score += sign * mobility_score(board, c);
+        score += sign * king_safety(board, c);
     }
     if board.side == Color::Black { score = -score; }
+    score
+}
+
+/// True if side to move has no major pieces — null move pruning should be skipped (zugzwang risk).
+pub fn is_endgame(board: &Board) -> bool {
+    let us = board.side as usize;
+    board.pieces[us][Piece::Queen as usize] == 0
+        && board.pieces[us][Piece::Rook as usize] == 0
+}
+
+// ── Pawn structure ────────────────────────────────────────────────────────────
+
+const PASSED_PAWN_BONUS: [i32; 8] = [0, 5, 10, 20, 35, 60, 100, 0];
+const DOUBLED_PAWN_PENALTY: i32 = 20;
+const ISOLATED_PAWN_PENALTY: i32 = 15;
+
+fn pawn_structure(board: &Board, us: usize) -> i32 {
+    let them = 1 - us;
+    let our_pawns  = board.pieces[us][Piece::Pawn as usize];
+    let their_pawns = board.pieces[them][Piece::Pawn as usize];
+    let mut score = 0i32;
+
+    // Doubled pawns
+    for file in 0..8usize {
+        let file_mask = FILE_A << file;
+        let count = (our_pawns & file_mask).count_ones();
+        if count > 1 {
+            score -= DOUBLED_PAWN_PENALTY * (count - 1) as i32;
+        }
+    }
+
+    let mut p = our_pawns;
+    while p != 0 {
+        let sq = p.trailing_zeros() as usize;
+        let file = sq % 8;
+
+        // Isolated: no friendly pawns on adjacent files
+        let adj_files = (if file > 0 { FILE_A << (file - 1) } else { 0 })
+                      | (if file < 7 { FILE_A << (file + 1) } else { 0 });
+        if our_pawns & adj_files == 0 {
+            score -= ISOLATED_PAWN_PENALTY;
+        }
+
+        // Passed pawn: no enemy pawns ahead on same/adjacent files
+        if their_pawns & passed_pawn_mask(us, sq) == 0 {
+            let rank = sq / 8;
+            let advance = if us == 0 { rank } else { 7 - rank };
+            score += PASSED_PAWN_BONUS[advance.min(7)];
+        }
+
+        p &= p - 1;
+    }
+    score
+}
+
+fn passed_pawn_mask(us: usize, sq: usize) -> u64 {
+    let file = sq % 8;
+    let rank = sq / 8;
+    let adj = (FILE_A << file)
+        | (if file > 0 { FILE_A << (file - 1) } else { 0 })
+        | (if file < 7 { FILE_A << (file + 1) } else { 0 });
+    if us == 0 {
+        if rank >= 7 { 0 } else { adj & (u64::MAX << ((rank + 1) * 8)) }
+    } else {
+        if rank == 0 { 0 } else { adj & ((1u64 << (rank * 8)) - 1) }
+    }
+}
+
+// ── Mobility ──────────────────────────────────────────────────────────────────
+
+fn mobility_score(board: &Board, us: usize) -> i32 {
+    let our_occ = board.occ[us];
+    let occ = board.all;
+    let mut score = 0i32;
+
+    let mut bishops = board.pieces[us][Piece::Bishop as usize];
+    while bishops != 0 {
+        let sq = bishops.trailing_zeros() as usize;
+        score += (bishop_attacks(sq, occ) & !our_occ).count_ones() as i32 * 3;
+        bishops &= bishops - 1;
+    }
+
+    let mut rooks = board.pieces[us][Piece::Rook as usize];
+    while rooks != 0 {
+        let sq = rooks.trailing_zeros() as usize;
+        score += (rook_attacks(sq, occ) & !our_occ).count_ones() as i32 * 2;
+        rooks &= rooks - 1;
+    }
+
+    score
+}
+
+// ── King safety ───────────────────────────────────────────────────────────────
+
+fn king_safety(board: &Board, us: usize) -> i32 {
+    let them = 1 - us;
+    // Only relevant when opponent has major pieces
+    if board.pieces[them][Piece::Queen as usize] == 0
+        && board.pieces[them][Piece::Rook as usize] == 0 {
+        return 0;
+    }
+
+    let king_bb = board.pieces[us][Piece::King as usize];
+    if king_bb == 0 { return 0; }
+    let king_sq   = king_bb.trailing_zeros() as usize;
+    let king_file = king_sq % 8;
+    let king_rank = king_sq / 8;
+    let our_pawns = board.pieces[us][Piece::Pawn as usize];
+    let mut score = 0i32;
+
+    // Pawn shield bonus
+    let shield_rank = if us == 0 { king_rank + 1 } else { king_rank.wrapping_sub(1) };
+    if shield_rank < 8 {
+        let shield_files = (FILE_A << king_file)
+            | (if king_file > 0 { FILE_A << (king_file - 1) } else { 0 })
+            | (if king_file < 7 { FILE_A << (king_file + 1) } else { 0 });
+        let rank_mask = 0xFFu64 << (shield_rank * 8);
+        score += (our_pawns & shield_files & rank_mask).count_ones() as i32 * 10;
+    }
+
+    // Open file toward king
+    if our_pawns & (FILE_A << king_file) == 0 {
+        score -= 20;
+    }
+
     score
 }
 

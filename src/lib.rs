@@ -31,16 +31,16 @@ impl Engine {
         self.searcher.clear_for_search();
         let mut info = SearchInfo::new_depth(depth);
         let (mv, _) = self.searcher.search(&board, &mut info);
-        // Fallback: if search returned null move (TT miss / no improvement),
-        // return the first legal move so the game is never stuck.
-        if mv == Move::default() {
-            let moves = legal_moves(&board);
-            if let Some(&fallback) = moves.first() {
-                return fallback.to_uci();
-            }
-            return String::new();
+        // Always validate against legal moves — never return an illegal move.
+        let legal = legal_moves(&board);
+        if legal.iter().any(|&m| m == mv) {
+            return mv.to_uci();
         }
-        mv.to_uci()
+        // Fallback to first legal move (search returned null/illegal move).
+        if let Some(&fallback) = legal.first() {
+            return fallback.to_uci();
+        }
+        String::new()
     }
 
     /// Evaluate position in centipawns from white's perspective.

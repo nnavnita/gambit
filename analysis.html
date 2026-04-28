@@ -11,9 +11,10 @@
     background: #0f0f1a;
     color: #e0e0e0;
     font-family: 'Segoe UI', system-ui, sans-serif;
-    min-height: 100vh;
+    height: 100vh;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
 
   header {
@@ -297,11 +298,18 @@
   .ann-inaccuracy{ color: #8888ff; }
   .ann-best      { color: #4caf50; }
 
+  .move-cell.bg-blunder    { background: rgba(224,85,85,0.18); border-left: 3px solid #e05555; }
+  .move-cell.bg-mistake    { background: rgba(240,165,0,0.15); border-left: 3px solid #f0a500; }
+  .move-cell.bg-inaccuracy { background: rgba(136,136,255,0.12); border-left: 3px solid #8888ff; }
+
+  .move-ann { font-size: 0.82rem; font-weight: 800; flex-shrink: 0; }
+
   .move-eval {
     font-size: 0.68rem;
     color: #555;
     flex-shrink: 0;
   }
+
 
   #progress-wrap {
     padding: 12px 14px;
@@ -328,7 +336,7 @@
 
   #legend {
     padding: 10px 14px;
-    border-top: 1px solid #2a2a4a;
+    border-bottom: 1px solid #2a2a4a;
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
@@ -369,7 +377,7 @@
   #summary-bar {
     display: none;
     padding: 8px 14px;
-    border-top: 1px solid #2a2a4a;
+    border-bottom: 1px solid #2a2a4a;
     gap: 16px;
     font-size: 0.78rem;
     flex-wrap: wrap;
@@ -381,6 +389,55 @@
   .blunder-sq   { background: rgba(224,85,85,0.4) !important; }
   .mistake-sq   { background: rgba(240,165,0,0.4)  !important; }
   .inaccuracy-sq{ background: rgba(136,136,255,0.4)!important; }
+
+  /* ── Back button (mobile only) ── */
+  #back-btn-mobile {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    background: #2a2a4a;
+    color: #c0c0e0;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    margin-bottom: 8px;
+    align-self: flex-start;
+  }
+  #back-btn-mobile:hover { background: #3a3a5a; }
+
+  /* ── Mobile layout ── */
+  @media (max-width: 768px) {
+    #main { flex-direction: column; overflow-y: auto; overflow-x: hidden; }
+    #game-list {
+      width: 100%; min-width: unset;
+      border-right: none; border-bottom: 1px solid #2a2a4a;
+      max-height: 55vh; flex-shrink: 0;
+    }
+    #game-list.collapsed { display: none; }
+    #analysis-area { flex-direction: column; overflow-y: auto; overflow-x: hidden; }
+    #board-section { padding: 12px; align-items: flex-start; width: 100%; }
+    #back-btn-mobile { display: flex; }
+    #board {
+      grid-template-columns: repeat(8, 42px) !important;
+      grid-template-rows: repeat(8, 42px) !important;
+    }
+    .sq { width: 42px !important; height: 42px !important; }
+    #eval-bar-wrap { height: 336px !important; }
+    #player-bar, #player-bar-bottom { width: 100% !important; max-width: 356px; }
+    #coord-files, #coord-files-b, #coord-ranks { display: none !important; }
+    #move-panel {
+      width: 100%; min-width: unset;
+      border-left: none; border-top: 1px solid #2a2a4a;
+      max-height: 45vh; flex-shrink: 0;
+    }
+    #input-bar { flex-wrap: wrap; }
+    input#username { width: 100%; }
+    nav { gap: 4px; }
+    nav a { padding: 6px 10px; font-size: 0.8rem; }
+    header h1 { font-size: 1rem; }
+  }
 </style>
 </head>
 <body>
@@ -433,7 +490,6 @@
 
 <script type="module">
 import { Chess } from 'https://esm.sh/chess.js@1';
-import init, { Engine } from './pkg/gambit.js';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const PIECE_URL = (color, type) =>
@@ -446,15 +502,11 @@ const ANN_INACCURACY = { label: '?!', cls: 'ann-inaccuracy', sqCls: 'inaccuracy-
 const ANALYSIS_DEPTH = 4;
 
 // ── State ────────────────────────────────────────────────────────────────────
-let engine = null;
 let currentGame = null;      // { fens, moves, evals, annotations, header }
 let currentMoveIdx = 0;      // which position we're viewing (0 = start)
 let analysisUsername = '';
 
 // ── Init ─────────────────────────────────────────────────────────────────────
-await init();
-engine = new Engine();
-document.getElementById('loading').style.display = 'none';
 populateDateSelectors();
 
 // ── Date selectors ───────────────────────────────────────────────────────────
@@ -534,6 +586,10 @@ function renderGameList(games, username) {
       document.querySelectorAll('.game-item').forEach(el => el.classList.remove('selected'));
       div.classList.add('selected');
       loadGame(g, username);
+      // Collapse game list on mobile after selection
+      if (window.innerWidth <= 768) {
+        document.getElementById('game-list').classList.add('collapsed');
+      }
     };
     list.appendChild(div);
   });
@@ -561,7 +617,7 @@ async function loadGame(gameData, username) {
     fens.push(replayChess.fen());
   }
 
-  currentGame = { fens, moves, evals: [], annotations: [], header, isWhite, gameData };
+  currentGame = { fens, moves, evals: [], annotations: [], bestMoves: [], header, isWhite, gameData };
   currentMoveIdx = 0;
 
   showAnalysisUI();
@@ -581,16 +637,19 @@ async function analyseGame(fens, moves, isWhite) {
   progressWrap.classList.add('visible');
 
   const evals = [];
+  const bestMoves = [];
   for (let i = 0; i < fens.length; i++) {
     progressText.textContent = `Analysing position ${i} / ${fens.length - 1}…`;
     progressFill.style.width = `${(i / (fens.length - 1)) * 100}%`;
 
-    const cp = await getEval(fens[i]);
-    evals.push(cp);
+    const { score, bestMove } = await getEval(fens[i]);
+    evals.push(score);
+    bestMoves.push(bestMove);
     currentGame.evals = evals;
+    currentGame.bestMoves = bestMoves;
 
     // Update eval bar as we go
-    if (i === currentMoveIdx) setEvalBar(cp);
+    if (i === currentMoveIdx) setEvalBar(score);
   }
 
   progressWrap.classList.remove('visible');
@@ -606,69 +665,54 @@ async function analyseGame(fens, moves, isWhite) {
 
 async function getEval(fen) {
   return new Promise(resolve => {
-    const timer = setTimeout(() => resolve(0), 10000);
+    const timer = setTimeout(() => resolve({ score: 0, bestMove: '' }), 10000);
     const chess = new Chess();
-    try { chess.load(fen); } catch(e) { clearTimeout(timer); resolve(0); return; }
+    try { chess.load(fen); } catch(e) { clearTimeout(timer); resolve({ score: 0, bestMove: '' }); return; }
 
     // Check for game-over positions
     if (chess.isCheckmate()) {
       clearTimeout(timer);
-      resolve(chess.turn() === 'w' ? -90000 : 90000);
+      resolve({ score: chess.turn() === 'w' ? -90000 : 90000, bestMove: '' });
       return;
     }
-    if (chess.isDraw()) { clearTimeout(timer); resolve(0); return; }
+    if (chess.isDraw()) { clearTimeout(timer); resolve({ score: 0, bestMove: '' }); return; }
 
-    const pendingResolve = (cp) => { clearTimeout(timer); resolve(cp); };
-    engineQueue.push({ fen, depth: ANALYSIS_DEPTH, resolve: pendingResolve });
-    drainQueue();
+    const pendingResolve = (result) => { clearTimeout(timer); resolve(result); };
+    evalQueue.push({ fen, depth: ANALYSIS_DEPTH, resolve: pendingResolve });
+    drainEvalQueue();
   });
 }
 
-// Simple serial queue for engine calls
-const engineQueue = [];
-let engineBusy = false;
-let pendingEngineResolve = null;
-
-const analysisWorker = new Worker('./worker.js', { type: 'module' });
-analysisWorker.onmessage = (e) => {
-  if (e.data.type === 'ready') return;
-  if (e.data.type === 'move' && pendingEngineResolve) {
-    // Convert UCI move eval: engine returns best move, we need the score.
-    // We'll use the eval from the worker - but our engine only returns a move string.
-    // So we need to call a separate eval function.
-    // Actually we return cp score separately — see evalWorker below.
-  }
-};
-
-// Use a second worker that returns eval score
-const evalWorker = new Worker('./eval_worker.js', { type: 'module' });
+// Serial queue for eval worker
+const evalQueue = [];
 let evalBusy = false;
 let pendingEvalResolve = null;
-const evalQueue2 = [];
 
+const evalWorker = new Worker('./eval_worker.js', { type: 'module' });
 evalWorker.onmessage = (e) => {
-  if (e.data.type === 'ready') return;
+  if (e.data.type === 'ready') {
+    document.getElementById('loading').style.display = 'none';
+    return;
+  }
   if (e.data.type === 'eval' && pendingEvalResolve) {
     const r = pendingEvalResolve;
     pendingEvalResolve = null;
     evalBusy = false;
-    r(e.data.score);
+    r({ score: e.data.score, bestMove: e.data.bestMove || '' });
     drainEvalQueue();
   }
 };
 evalWorker.onerror = (e) => {
   console.error('Eval worker error:', e);
-  if (pendingEvalResolve) { pendingEvalResolve(0); pendingEvalResolve = null; }
+  if (pendingEvalResolve) { pendingEvalResolve({ score: 0, bestMove: '' }); pendingEvalResolve = null; }
   evalBusy = false;
   drainEvalQueue();
 };
 
-function drainQueue() { drainEvalQueue(); }
-
 function drainEvalQueue() {
-  if (evalBusy || engineQueue.length === 0) return;
+  if (evalBusy || evalQueue.length === 0) return;
   evalBusy = true;
-  const { fen, depth, resolve } = engineQueue.shift();
+  const { fen, depth, resolve } = evalQueue.shift();
   pendingEvalResolve = resolve;
   evalWorker.postMessage({ fen, depth });
 }
@@ -700,6 +744,7 @@ function showAnalysisUI() {
   const area = document.getElementById('analysis-area');
   area.innerHTML = `
     <div id="board-section">
+      <button id="back-btn-mobile">← Games</button>
       <div id="player-bar" class="player-bar-top"></div>
       <div id="board-with-eval">
         <div id="eval-bar-wrap">
@@ -710,7 +755,10 @@ function showAnalysisUI() {
           <div style="display:flex;gap:4px;margin-bottom:4px;" id="coord-files"></div>
           <div style="display:flex;gap:0">
             <div id="coord-ranks" style="display:flex;flex-direction:column;justify-content:space-around;width:14px;font-size:0.6rem;color:#666;text-align:center"></div>
-            <div id="board"></div>
+            <div style="position:relative;display:inline-block;">
+              <div id="board"></div>
+              <svg id="board-arrows" style="position:absolute;top:0;left:0;width:400px;height:400px;pointer-events:none;"></svg>
+            </div>
           </div>
           <div style="display:flex;gap:4px;margin-top:4px;" id="coord-files-b"></div>
         </div>
@@ -728,17 +776,17 @@ function showAnalysisUI() {
         <span>Moves</span>
         <span id="accuracy-display"></span>
       </div>
-      <div id="move-scroll"></div>
-      <div id="progress-wrap">
-        <div id="progress-text">Analysing…</div>
-        <div id="progress-bar-bg"><div id="progress-bar-fill"></div></div>
-      </div>
+      <div id="summary-bar"></div>
       <div id="legend">
         <div class="legend-item"><div class="legend-dot" style="background:#e05555"></div>Blunder (??)</div>
         <div class="legend-item"><div class="legend-dot" style="background:#f0a500"></div>Mistake (?)</div>
         <div class="legend-item"><div class="legend-dot" style="background:#8888ff"></div>Inaccuracy (?!)</div>
       </div>
-      <div id="summary-bar"></div>
+      <div id="move-scroll"></div>
+      <div id="progress-wrap">
+        <div id="progress-text">Analysing…</div>
+        <div id="progress-bar-bg"><div id="progress-bar-fill"></div></div>
+      </div>
     </div>
   `;
 
@@ -749,6 +797,12 @@ function showAnalysisUI() {
   const cr = document.getElementById('coord-ranks');
   files.forEach(f => { const s = document.createElement('span'); s.textContent=f; s.style.cssText='width:50px;text-align:center;font-size:0.6rem;color:#666'; cf.appendChild(s); });
   ranks.forEach(r => { const s = document.createElement('span'); s.textContent=r; cr.appendChild(s); });
+
+  // Back button (mobile)
+  document.getElementById('back-btn-mobile').onclick = () => {
+    document.getElementById('game-list').classList.remove('collapsed');
+    document.getElementById('game-list').scrollIntoView({ behavior: 'smooth' });
+  };
 
   // Nav buttons
   document.getElementById('btn-start').onclick = () => goToMove(0);
@@ -768,6 +822,64 @@ function showAnalysisUI() {
   });
 }
 
+function uciToSan(fen, uci) {
+  if (!uci || uci.length < 4) return uci;
+  const c = new Chess();
+  try { c.load(fen); } catch(e) { return uci; }
+  try {
+    const m = c.move({ from: uci.slice(0,2), to: uci.slice(2,4), promotion: uci[4] || 'q' });
+    return m ? m.san : uci;
+  } catch(e) { return uci; }
+}
+
+function sqCenter(sq) {
+  const file = 'abcdefgh'.indexOf(sq[0]);
+  const rank = 8 - parseInt(sq[1]);
+  return { x: file * 50 + 25, y: rank * 50 + 25 };
+}
+
+function drawArrow(svg, fromSq, toSq, color) {
+  svg.innerHTML = '';
+  if (!fromSq || !toSq || fromSq === toSq) return;
+
+  const ns = 'http://www.w3.org/2000/svg';
+  const from = sqCenter(fromSq);
+  const to   = sqCenter(toSq);
+
+  const dx = to.x - from.x, dy = to.y - from.y;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  const nx = dx / len, ny = dy / len;
+
+  // Arrowhead marker
+  const defs   = document.createElementNS(ns, 'defs');
+  const marker = document.createElementNS(ns, 'marker');
+  marker.setAttribute('id', 'bm-arrow');
+  marker.setAttribute('markerWidth', '4');
+  marker.setAttribute('markerHeight', '4');
+  marker.setAttribute('refX', '2');
+  marker.setAttribute('refY', '2');
+  marker.setAttribute('orient', 'auto');
+  const poly = document.createElementNS(ns, 'polygon');
+  poly.setAttribute('points', '0 0, 4 2, 0 4');
+  poly.setAttribute('fill', color);
+  marker.appendChild(poly);
+  defs.appendChild(marker);
+  svg.appendChild(defs);
+
+  // Shorten line so it doesn't overlap arrowhead
+  const line = document.createElementNS(ns, 'line');
+  line.setAttribute('x1', from.x + nx * 18);
+  line.setAttribute('y1', from.y + ny * 18);
+  line.setAttribute('x2', to.x   - nx * 16);
+  line.setAttribute('y2', to.y   - ny * 16);
+  line.setAttribute('stroke', color);
+  line.setAttribute('stroke-width', '9');
+  line.setAttribute('stroke-linecap', 'round');
+  line.setAttribute('opacity', '0.82');
+  line.setAttribute('marker-end', 'url(#bm-arrow)');
+  svg.appendChild(line);
+}
+
 function goToMove(idx) {
   if (!currentGame) return;
   idx = Math.max(0, Math.min(idx, currentGame.fens.length - 1));
@@ -777,6 +889,16 @@ function goToMove(idx) {
   renderBoard(currentGame.fens[idx], lastMove, ann);
   if (currentGame.evals[idx] !== undefined) setEvalBar(currentGame.evals[idx]);
   highlightActiveMove(idx);
+
+  // Draw best-move arrow for annotated moves
+  const svg = document.getElementById('board-arrows');
+  if (svg && ann && idx > 0 && currentGame.bestMoves[idx - 1]) {
+    const uci   = currentGame.bestMoves[idx - 1];
+    const color = ann === ANN_BLUNDER ? '#e05555' : ann === ANN_MISTAKE ? '#f0a500' : '#8888ff';
+    drawArrow(svg, uci.slice(0, 2), uci.slice(2, 4), color);
+  } else if (svg) {
+    svg.innerHTML = '';
+  }
 }
 
 function renderBoard(fen, lastMove, ann) {
@@ -850,7 +972,7 @@ function updatePlayerBars(header, gameData, isWhite) {
     <span class="player-name">${wName}</span>
     <span class="player-rating">${wRat ? '(' + wRat + ')' : ''}</span>
   `;
-  top.style.width = bot.style.width = '400px';
+  if (window.innerWidth > 768) top.style.width = bot.style.width = '400px';
 }
 
 function renderMoveListSkeleton(moves) {
@@ -893,7 +1015,8 @@ function renderMoveList(moves, evals, annotations) {
       const ann  = annotations[mi];
       const cp   = evals[mi + 1];
       const cell = document.createElement('span');
-      cell.className = 'move-cell';
+      const bgCls = ann === ANN_BLUNDER ? 'bg-blunder' : ann === ANN_MISTAKE ? 'bg-mistake' : ann === ANN_INACCURACY ? 'bg-inaccuracy' : '';
+      cell.className = 'move-cell' + (bgCls ? ' ' + bgCls : '');
       cell.dataset.idx = mi + 1;
 
       const sanEl = document.createElement('span');
@@ -974,7 +1097,7 @@ function renderSummary(annotations, isWhite) {
 function formatEval(cp) {
   if (Math.abs(cp) >= 90000) {
     const side = cp > 0 ? '' : '-';
-    return side + 'M' + Math.ceil((90000 - Math.abs(cp)) / 2);
+    return side + 'M' + Math.ceil((900000 - Math.abs(cp)) / 2);
   }
   const pawns = cp / 100;
   return (pawns >= 0 ? '+' : '') + pawns.toFixed(1);

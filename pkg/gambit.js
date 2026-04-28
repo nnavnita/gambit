@@ -32,6 +32,18 @@ export class Engine {
         }
     }
     /**
+     * Evaluate position in centipawns from white's perspective.
+     * @param {string} fen
+     * @param {number} depth
+     * @returns {number}
+     */
+    eval_position(fen, depth) {
+        const ptr0 = passStringToWasm0(fen, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.engine_eval_position(this.__wbg_ptr, ptr0, len0, depth);
+        return ret;
+    }
+    /**
      * All legal moves for given FEN as comma-separated UCI strings.
      * @param {string} fen
      * @returns {string}

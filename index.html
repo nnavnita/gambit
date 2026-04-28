@@ -291,6 +291,14 @@
 
     <div class="panel controls">
       <button id="btn-new">New Game</button>
+      <div>
+        <div class="panel-title" style="margin-bottom:6px">Play as</div>
+        <div style="display:flex;gap:6px;">
+          <button id="btn-white" class="secondary" style="flex:1;font-size:0.78rem;padding:7px 4px;">♔ White</button>
+          <button id="btn-random" class="secondary" style="flex:1;font-size:0.78rem;padding:7px 4px;">? Random</button>
+          <button id="btn-black" class="secondary" style="flex:1;font-size:0.78rem;padding:7px 4px;">♚ Black</button>
+        </div>
+      </div>
       <button id="btn-flip" class="secondary">Flip Board</button>
       <div class="depth-row">
         <span>Depth</span>
@@ -318,6 +326,7 @@ let lastMove = null;
 let thinking = false;
 let depth = 3;
 let pendingMoveResolve = null;
+let playerColor = 'w'; // 'w' or 'b'
 
 // Lichess open-source piece set (cburnett, MIT licence)
 const PIECE_URL = (color, type) =>
@@ -329,6 +338,7 @@ const worker = new Worker('./worker.js', { type: 'module' });
 worker.onmessage = (e) => {
   if (e.data.type === 'ready') {
     document.getElementById('loading').style.display = 'none';
+    updateColorButtons();
     renderBoard();
     updateStatus();
   }
@@ -365,15 +375,40 @@ function engineMove(fen, d) {
 }
 
 // ── Controls ───────────────────────────────────────────────────────────────
-document.getElementById('btn-new').onclick = () => {
+function startGame() {
   chess = new Chess();
   selected = null;
   legalDests = [];
   lastMove = null;
   thinking = false;
+  flipped = playerColor === 'b';
   renderBoard();
   updateStatus();
   renderHistory();
+  updateColorButtons();
+  // If player is black, engine moves first
+  if (playerColor === 'b') triggerEngineMove();
+}
+
+function updateColorButtons() {
+  document.getElementById('btn-white').style.outline  = playerColor === 'w' ? '2px solid #e94560' : '';
+  document.getElementById('btn-black').style.outline  = playerColor === 'b' ? '2px solid #e94560' : '';
+  document.getElementById('btn-random').style.outline = '';
+}
+
+document.getElementById('btn-new').onclick = startGame;
+
+document.getElementById('btn-white').onclick = () => {
+  playerColor = 'w';
+  startGame();
+};
+document.getElementById('btn-random').onclick = () => {
+  playerColor = Math.random() < 0.5 ? 'w' : 'b';
+  startGame();
+};
+document.getElementById('btn-black').onclick = () => {
+  playerColor = 'b';
+  startGame();
 };
 
 document.getElementById('btn-flip').onclick = () => {
@@ -447,7 +482,7 @@ function renderBoard() {
 // ── Click logic ────────────────────────────────────────────────────────────
 function onSquareClick(sq) {
   if (thinking || chess.isGameOver()) return;
-  if (chess.turn() !== 'w') return; // human plays white
+  if (chess.turn() !== playerColor) return;
 
   const piece = chess.get(sq);
 
@@ -458,7 +493,7 @@ function onSquareClick(sq) {
   }
 
   // Select own piece
-  if (piece && piece.color === 'w') {
+  if (piece && piece.color === playerColor) {
     selected = sq;
     legalDests = chess.moves({ square: sq, verbose: true }).map(m => m.to);
     renderBoard();
@@ -471,27 +506,13 @@ function onSquareClick(sq) {
   renderBoard();
 }
 
-async function doMove(from, to) {
-  // Try move (promote to queen by default)
-  const move = chess.move({ from, to, promotion: 'q' });
-  if (!move) return;
-
-  lastMove = { from, to };
-  selected = null;
-  legalDests = [];
-  renderBoard();
-  renderHistory();
-  updateStatus();
-
+async function triggerEngineMove() {
   if (chess.isGameOver()) return;
-
-  // Engine response
   thinking = true;
   updateStatus();
   renderBoard();
 
   const uciMove = await engineMove(chess.fen(), depth);
-
   thinking = false;
 
   if (uciMove && uciMove.length >= 4 && uciMove.slice(0,2) !== uciMove.slice(2,4)) {
@@ -500,7 +521,13 @@ async function doMove(from, to) {
     const epro = uciMove.length > 4 ? uciMove[4] : 'q';
     try {
       const emove = chess.move({ from: ef, to: et, promotion: epro });
-      if (emove) lastMove = { from: ef, to: et };
+      if (emove) {
+        lastMove = { from: ef, to: et };
+        if (chess.isCheckmate()) playGameOverSound();
+        else if (chess.inCheck()) playCheckSound();
+        else if (emove.captured) playCaptureSound();
+        else playMoveSound();
+      }
     } catch (err) {
       console.error('Engine returned illegal move:', uciMove, err);
     }
@@ -509,6 +536,29 @@ async function doMove(from, to) {
   renderBoard();
   renderHistory();
   updateStatus();
+}
+
+async function doMove(from, to) {
+  // Try move (promote to queen by default)
+  const move = chess.move({ from, to, promotion: 'q' });
+  if (!move) return;
+
+  lastMove = { from, to };
+  selected = null;
+  legalDests = [];
+
+  if (chess.isCheckmate()) playGameOverSound();
+  else if (chess.inCheck()) playCheckSound();
+  else if (move.captured) playCaptureSound();
+  else playMoveSound();
+
+  renderBoard();
+  renderHistory();
+  updateStatus();
+
+  if (chess.isGameOver()) return;
+
+  await triggerEngineMove();
 }
 
 // ── Status ─────────────────────────────────────────────────────────────────
@@ -523,7 +573,8 @@ function updateStatus() {
   }
   if (chess.isCheckmate()) {
     const winner = chess.turn() === 'w' ? 'Black' : 'White';
-    el.className = winner === 'White' ? 'win' : 'lose';
+    const playerWon = (winner === 'White') === (playerColor === 'w');
+    el.className = playerWon ? 'win' : 'lose';
     el.textContent = winner + ' wins by checkmate!';
     return;
   }
@@ -539,7 +590,7 @@ function updateStatus() {
     el.textContent = (chess.turn() === 'w' ? 'White' : 'Black') + ' is in check!';
     return;
   }
-  el.textContent = chess.turn() === 'w' ? 'Your turn (White)' : 'Black to move';
+  el.textContent = chess.turn() === playerColor ? 'Your turn' : 'Gambit thinking…';
 }
 
 // ── History ────────────────────────────────────────────────────────────────
@@ -572,6 +623,36 @@ function renderHistory() {
     el.appendChild(row);
   }
   el.scrollTop = el.scrollHeight;
+}
+
+// ── Sound system ───────────────────────────────────────────────────────────
+let _audioCtx = null;
+function getAudioCtx() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (_audioCtx.state === 'suspended') _audioCtx.resume();
+  return _audioCtx;
+}
+
+function beep(freq, duration, volume = 0.2, type = 'sine', delay = 0) {
+  try {
+    const ctx = getAudioCtx();
+    const t = ctx.currentTime + delay;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(volume, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(t); osc.stop(t + duration);
+  } catch(e) {}
+}
+
+function playMoveSound()    { beep(440, 0.08); }
+function playCaptureSound() { beep(300, 0.1, 0.25); }
+function playCheckSound()   { beep(880, 0.09, 0.2); beep(880, 0.09, 0.2, 'sine', 0.12); }
+function playGameOverSound() {
+  [523, 415, 262].forEach((f, i) => beep(f, 0.5, 0.3, 'sine', i * 0.3));
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────

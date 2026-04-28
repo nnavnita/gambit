@@ -9,6 +9,10 @@ export class Engine {
      */
     best_move(fen: string, depth: number): string;
     /**
+     * Evaluate position in centipawns from white's perspective.
+     */
+    eval_position(fen: string, depth: number): number;
+    /**
      * All legal moves for given FEN as comma-separated UCI strings.
      */
     legal_moves_for(fen: string): string;
@@ -21,6 +25,7 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_engine_free: (a: number, b: number) => void;
     readonly engine_best_move: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly engine_eval_position: (a: number, b: number, c: number, d: number) => number;
     readonly engine_legal_moves_for: (a: number, b: number, c: number) => [number, number];
     readonly engine_new: () => number;
     readonly __wbindgen_free: (a: number, b: number, c: number) => void;
