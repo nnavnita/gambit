@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gambit Chess</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♞</text></svg>">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -260,7 +261,7 @@
 </div>
 
 <header>
-  <img src="https://lichess1.org/assets/piece/cburnett/bN.svg" style="height:32px;width:32px" alt="knight">
+  <img src="https://lichess1.org/assets/piece/cburnett/wN.svg" style="height:32px;width:32px" alt="knight">
   <h1>Gambit</h1>
   <nav style="margin-left:auto;display:flex;gap:8px;">
     <a href="index.html" style="color:#fff;text-decoration:none;font-size:0.85rem;padding:6px 14px;border-radius:6px;background:#e94560;font-weight:600;">Play</a>
@@ -658,16 +659,16 @@ function playCaptureSound() {
 }
 
 function playCheckSound() {
-  // thwak — sharp mid-high crack
+  // plomp — deep low thud
   try { const ctx = getAudioCtx(), t = ctx.currentTime;
-    noise(ctx, t, 0.05, 0.45, 600, 350);
-    noise(ctx, t + 0.05, 0.08, 0.2, 350, 200); } catch(e) {}
+    noise(ctx, t, 0.4, 0.5, 120, 55); } catch(e) {}
 }
 
 function playGameOverSound() {
-  // plomp — deep low thud, slow decay
+  // thwak — sharp crack
   try { const ctx = getAudioCtx(), t = ctx.currentTime;
-    noise(ctx, t, 0.4, 0.5, 120, 55); } catch(e) {}
+    noise(ctx, t, 0.05, 0.45, 600, 350);
+    noise(ctx, t + 0.05, 0.08, 0.2, 350, 200); } catch(e) {}
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────

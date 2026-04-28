@@ -1285,7 +1285,17 @@ function highlightActiveMove(idx) {
     const el = document.querySelector(`.move-cell[data-idx="${idx}"]`);
     if (el) {
       el.classList.add('active');
-      el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      // Scroll only within #move-scroll, never the whole page
+      const container = document.getElementById('move-scroll');
+      if (container) {
+        const top = el.offsetTop - container.offsetTop;
+        const bottom = top + el.offsetHeight;
+        if (top < container.scrollTop) {
+          container.scrollTop = top - 4;
+        } else if (bottom > container.scrollTop + container.clientHeight) {
+          container.scrollTop = bottom - container.clientHeight + 4;
+        }
+      }
     }
   }
 }
