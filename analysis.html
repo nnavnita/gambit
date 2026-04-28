@@ -334,15 +334,93 @@
     width: 0%;
   }
 
-  #legend {
-    padding: 10px 14px;
+  /* ── Eval graph ── */
+  #eval-graph {
+    display: block;
+    width: 100%;
+    height: 80px;
     border-bottom: 1px solid #2a2a4a;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+    background: #0d0d18;
+    cursor: pointer;
   }
-  .legend-item { display: flex; align-items: center; gap: 4px; font-size: 0.7rem; color: #666; }
-  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* ── Accuracy section ── */
+  #accuracy-section {
+    border-bottom: 1px solid #2a2a4a;
+  }
+  .acc-label {
+    text-align: center;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #555;
+    padding: 8px 0 4px;
+  }
+  .acc-row {
+    display: flex;
+  }
+  .acc-block {
+    flex: 1;
+    text-align: center;
+    padding: 6px 8px 10px;
+    background: #f0d9b5;
+  }
+  .acc-block.acc-black {
+    background: #1a1a1a;
+  }
+  .acc-block .acc-name {
+    font-size: 0.7rem;
+    color: #888;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .acc-block .acc-pct {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    line-height: 1.2;
+  }
+  .acc-block.acc-black .acc-name { color: #666; }
+  .acc-block.acc-black .acc-pct  { color: #e0e0e0; }
+
+  /* ── Classification table ── */
+  .class-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    border-bottom: 1px solid #2a2a4a;
+  }
+  .class-table thead th {
+    padding: 6px 10px;
+    font-size: 0.68rem;
+    color: #555;
+    font-weight: 400;
+    text-align: center;
+  }
+  .class-table thead th:first-child { text-align: right; }
+  .class-table thead th:last-child  { text-align: left; }
+  .class-table tbody td {
+    padding: 4px 10px;
+    text-align: center;
+    font-weight: 600;
+    color: #ccc;
+  }
+  .class-table tbody td:first-child { text-align: right; }
+  .class-table tbody td:last-child  { text-align: left; }
+  .class-table tbody tr:hover { background: #1a1a2e; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .badge-best       { background: rgba(76,175,80,0.15);  color: #4caf50; }
+  .badge-inaccuracy { background: rgba(136,136,255,0.15); color: #8888ff; }
+  .badge-mistake    { background: rgba(240,165,0,0.15);  color: #f0a500; }
+  .badge-blunder    { background: rgba(224,85,85,0.15);  color: #e05555; }
 
   #placeholder {
     flex: 1;
@@ -374,17 +452,8 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  #summary-bar {
-    display: none;
-    padding: 8px 14px;
-    border-bottom: 1px solid #2a2a4a;
-    gap: 16px;
-    font-size: 0.78rem;
-    flex-wrap: wrap;
-  }
-  #summary-bar.visible { display: flex; }
-  .stat { display: flex; align-items: center; gap: 5px; color: #888; }
-  .stat b { color: #e0e0e0; }
+  #summary-bar { display: none; }
+  #summary-bar.visible { display: block; }
 
   .blunder-sq   { background: rgba(224,85,85,0.4) !important; }
   .mistake-sq   { background: rgba(240,165,0,0.4)  !important; }
@@ -498,6 +567,7 @@ const PIECE_URL = (color, type) =>
 const ANN_BLUNDER    = { label: '??', cls: 'ann-blunder',    sqCls: 'blunder-sq',    threshold: 200 };
 const ANN_MISTAKE    = { label: '?',  cls: 'ann-mistake',    sqCls: 'mistake-sq',    threshold: 100 };
 const ANN_INACCURACY = { label: '?!', cls: 'ann-inaccuracy', sqCls: 'inaccuracy-sq', threshold: 50  };
+const ANN_BEST       = { label: '★',  cls: 'ann-best',       sqCls: '',              threshold: -1  };
 
 const ANALYSIS_DEPTH = 4;
 
@@ -656,11 +726,12 @@ async function analyseGame(fens, moves, isWhite) {
   progressFill.style.width = '100%';
 
   // Compute annotations
-  const annotations = computeAnnotations(evals, moves);
+  const annotations = computeAnnotations(evals, moves, bestMoves);
   currentGame.annotations = annotations;
 
+  renderEvalGraph(evals, annotations);
   renderMoveList(moves, evals, annotations);
-  renderSummary(annotations, isWhite);
+  renderSummary(evals, moves, annotations);
 }
 
 async function getEval(fen) {
@@ -718,25 +789,133 @@ function drainEvalQueue() {
 }
 
 // ── Annotations ──────────────────────────────────────────────────────────────
-function computeAnnotations(evals, moves) {
-  // evals[i] = white-perspective score at position i
+function computeAnnotations(evals, moves, bestMoves) {
   const annotations = [];
   for (let i = 0; i < moves.length; i++) {
-    const before = evals[i];
-    const after  = evals[i + 1];
+    const before = evals[i], after = evals[i + 1];
     if (before === undefined || after === undefined) { annotations.push(null); continue; }
 
     const isWhiteMove = moves[i].color === 'w';
-    // cp loss from the moving player's perspective
     const cpLoss = isWhiteMove ? (before - after) : (after - before);
 
     let ann = null;
     if      (cpLoss >= ANN_BLUNDER.threshold)    ann = ANN_BLUNDER;
     else if (cpLoss >= ANN_MISTAKE.threshold)    ann = ANN_MISTAKE;
     else if (cpLoss >= ANN_INACCURACY.threshold) ann = ANN_INACCURACY;
+    else if (cpLoss <= 10) {
+      // Best move: played move matches engine best OR nearly zero loss
+      const played = moves[i].from + moves[i].to + (moves[i].promotion || '');
+      const best   = (bestMoves && bestMoves[i]) || '';
+      if (!best || played === best || cpLoss <= 5) ann = ANN_BEST;
+    }
     annotations.push(ann);
   }
   return annotations;
+}
+
+function winPct(cp) {
+  return 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
+}
+
+function computeAccuracy(evals, moves, color) {
+  let totalLoss = 0, count = 0;
+  for (let i = 0; i < moves.length; i++) {
+    if (moves[i].color !== color) continue;
+    const before = evals[i], after = evals[i + 1];
+    if (before === undefined || after === undefined) continue;
+    const wpBefore = color === 'w' ? winPct(before)  : winPct(-before);
+    const wpAfter  = color === 'w' ? winPct(after)   : winPct(-after);
+    totalLoss += Math.max(0, wpBefore - wpAfter);
+    count++;
+  }
+  if (count === 0) return 100;
+  return Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.04354 * totalLoss / count) - 3.1669));
+}
+
+function countByCategory(annotations, moves, color) {
+  let best = 0, inaccuracy = 0, mistake = 0, blunder = 0;
+  annotations.forEach((ann, i) => {
+    if (moves[i].color !== color) return;
+    if (ann === ANN_BLUNDER)    blunder++;
+    else if (ann === ANN_MISTAKE)    mistake++;
+    else if (ann === ANN_INACCURACY) inaccuracy++;
+    else if (ann === ANN_BEST)       best++;
+  });
+  return { best, inaccuracy, mistake, blunder };
+}
+
+function renderEvalGraph(evals, annotations) {
+  const svg = document.getElementById('eval-graph');
+  if (!svg) return;
+  const W = svg.clientWidth || 280, H = 80;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = '';
+  const ns = 'http://www.w3.org/2000/svg';
+  const n = evals.length;
+  if (n < 2) return;
+
+  const clamp = cp => Math.max(-800, Math.min(800, cp));
+  const toY = cp => H / 2 - (clamp(cp) / 800) * (H / 2 - 4);
+  const toX = i => (i / (n - 1)) * W;
+  const pts = evals.map((cp, i) => ({ x: toX(i), y: toY(cp) }));
+  const mid = H / 2;
+
+  // White fill
+  let wp = `M ${pts[0].x} ${mid} ` + pts.map(p => `L ${p.x} ${Math.min(p.y, mid)}`).join(' ') + ` L ${pts[n-1].x} ${mid} Z`;
+  const wf = document.createElementNS(ns, 'path');
+  wf.setAttribute('d', wp); wf.setAttribute('fill', 'rgba(240,217,181,0.45)'); svg.appendChild(wf);
+
+  // Black fill
+  let bp = `M ${pts[0].x} ${mid} ` + pts.map(p => `L ${p.x} ${Math.max(p.y, mid)}`).join(' ') + ` L ${pts[n-1].x} ${mid} Z`;
+  const bf = document.createElementNS(ns, 'path');
+  bf.setAttribute('d', bp); bf.setAttribute('fill', 'rgba(30,30,30,0.7)'); svg.appendChild(bf);
+
+  // Midline
+  const ml = document.createElementNS(ns, 'line');
+  ml.setAttribute('x1', 0); ml.setAttribute('y1', mid); ml.setAttribute('x2', W); ml.setAttribute('y2', mid);
+  ml.setAttribute('stroke', '#2a2a4a'); ml.setAttribute('stroke-width', '1'); svg.appendChild(ml);
+
+  // Eval line
+  const pl = document.createElementNS(ns, 'polyline');
+  pl.setAttribute('points', pts.map(p => `${p.x},${p.y}`).join(' '));
+  pl.setAttribute('fill', 'none'); pl.setAttribute('stroke', '#c8c8c8'); pl.setAttribute('stroke-width', '1.5');
+  svg.appendChild(pl);
+
+  // Annotation dots
+  annotations.forEach((ann, i) => {
+    if (!ann || ann === ANN_BEST) return;
+    const p = pts[i + 1]; if (!p) return;
+    const dot = document.createElementNS(ns, 'circle');
+    dot.setAttribute('cx', p.x); dot.setAttribute('cy', p.y); dot.setAttribute('r', '3');
+    dot.setAttribute('fill', ann === ANN_BLUNDER ? '#e05555' : ann === ANN_MISTAKE ? '#f0a500' : '#8888ff');
+    svg.appendChild(dot);
+  });
+
+  // Cursor line
+  const cur = document.createElementNS(ns, 'line');
+  cur.setAttribute('id', 'graph-cursor');
+  cur.setAttribute('y1', 0); cur.setAttribute('y2', H);
+  cur.setAttribute('stroke', '#e94560'); cur.setAttribute('stroke-width', '1.5'); cur.setAttribute('opacity', '0.8');
+  svg.appendChild(cur);
+
+  // Click to navigate
+  svg.onclick = (e) => {
+    const rect = svg.getBoundingClientRect();
+    const frac = (e.clientX - rect.left) / rect.width;
+    const idx = Math.round(frac * (n - 1));
+    goToMove(idx);
+  };
+
+  updateGraphCursor(n);
+}
+
+function updateGraphCursor(totalPoints) {
+  const cur = document.getElementById('graph-cursor');
+  const svg = document.getElementById('eval-graph');
+  if (!cur || !svg) return;
+  const W = svg.clientWidth || 280;
+  const x = totalPoints > 1 ? (currentMoveIdx / (totalPoints - 1)) * W : 0;
+  cur.setAttribute('x1', x); cur.setAttribute('x2', x);
 }
 
 // ── UI rendering ─────────────────────────────────────────────────────────────
@@ -772,15 +951,10 @@ function showAnalysisUI() {
       </div>
     </div>
     <div id="move-panel">
+      <svg id="eval-graph"></svg>
+      <div id="summary-bar"></div>
       <div id="move-panel-header">
         <span>Moves</span>
-        <span id="accuracy-display"></span>
-      </div>
-      <div id="summary-bar"></div>
-      <div id="legend">
-        <div class="legend-item"><div class="legend-dot" style="background:#e05555"></div>Blunder (??)</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#f0a500"></div>Mistake (?)</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#8888ff"></div>Inaccuracy (?!)</div>
       </div>
       <div id="move-scroll"></div>
       <div id="progress-wrap">
@@ -889,6 +1063,7 @@ function goToMove(idx) {
   renderBoard(currentGame.fens[idx], lastMove, ann);
   if (currentGame.evals[idx] !== undefined) setEvalBar(currentGame.evals[idx]);
   highlightActiveMove(idx);
+  updateGraphCursor(currentGame.fens.length);
 
   // Draw best-move arrow for annotated moves
   const svg = document.getElementById('board-arrows');
@@ -1015,7 +1190,7 @@ function renderMoveList(moves, evals, annotations) {
       const ann  = annotations[mi];
       const cp   = evals[mi + 1];
       const cell = document.createElement('span');
-      const bgCls = ann === ANN_BLUNDER ? 'bg-blunder' : ann === ANN_MISTAKE ? 'bg-mistake' : ann === ANN_INACCURACY ? 'bg-inaccuracy' : '';
+      const bgCls = ann === ANN_BLUNDER ? 'bg-blunder' : ann === ANN_MISTAKE ? 'bg-mistake' : ann === ANN_INACCURACY ? 'bg-inaccuracy' : ann === ANN_BEST ? '' : '';
       cell.className = 'move-cell' + (bgCls ? ' ' + bgCls : '');
       cell.dataset.idx = mi + 1;
 
@@ -1058,37 +1233,40 @@ function highlightActiveMove(idx) {
   }
 }
 
-function renderSummary(annotations, isWhite) {
+function renderSummary(evals, moves, annotations) {
   const bar = document.getElementById('summary-bar');
   if (!bar) return;
 
-  const count = (color) => {
-    let b=0, m=0, i=0;
-    annotations.forEach((ann, idx) => {
-      if (!ann) return;
-      const moveColor = currentGame.moves[idx].color;
-      if (moveColor !== color) return;
-      if (ann === ANN_BLUNDER)    b++;
-      else if (ann === ANN_MISTAKE)    m++;
-      else if (ann === ANN_INACCURACY) i++;
-    });
-    return { b, m, i };
-  };
-
-  const w = count('w'), bk = count('b');
-  const myColor  = isWhite ? 'w' : 'b';
-  const myStats  = isWhite ? w  : bk;
-  const oppStats = isWhite ? bk : w;
+  const wAcc = computeAccuracy(evals, moves, 'w').toFixed(1);
+  const bAcc = computeAccuracy(evals, moves, 'b').toFixed(1);
+  const wName = (currentGame.header.White  || 'White').slice(0, 14);
+  const bName = (currentGame.header.Black  || 'Black').slice(0, 14);
+  const wC = countByCategory(annotations, moves, 'w');
+  const bC = countByCategory(annotations, moves, 'b');
 
   bar.innerHTML = `
-    <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:#444;width:100%;margin-bottom:2px">You</div>
-    <div class="stat"><div class="legend-dot" style="background:#e05555"></div><b>${myStats.b}</b> blunder${myStats.b!==1?'s':''}</div>
-    <div class="stat"><div class="legend-dot" style="background:#f0a500"></div><b>${myStats.m}</b> mistake${myStats.m!==1?'s':''}</div>
-    <div class="stat"><div class="legend-dot" style="background:#8888ff"></div><b>${myStats.i}</b> inaccurac${myStats.i!==1?'ies':'y'}</div>
-    <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:#444;width:100%;margin-top:4px;margin-bottom:2px">Opponent</div>
-    <div class="stat"><div class="legend-dot" style="background:#e05555"></div><b>${oppStats.b}</b> blunder${oppStats.b!==1?'s':''}</div>
-    <div class="stat"><div class="legend-dot" style="background:#f0a500"></div><b>${oppStats.m}</b> mistake${oppStats.m!==1?'s':''}</div>
-    <div class="stat"><div class="legend-dot" style="background:#8888ff"></div><b>${oppStats.i}</b> inaccurac${oppStats.i!==1?'ies':'y'}</div>
+    <div id="accuracy-section">
+      <div class="acc-label">Accuracies</div>
+      <div class="acc-row">
+        <div class="acc-block">
+          <div class="acc-name">${wName}</div>
+          <div class="acc-pct">${wAcc}%</div>
+        </div>
+        <div class="acc-block acc-black">
+          <div class="acc-name">${bName}</div>
+          <div class="acc-pct">${bAcc}%</div>
+        </div>
+      </div>
+    </div>
+    <table class="class-table">
+      <thead><tr><th>${wName}</th><th></th><th>${bName}</th></tr></thead>
+      <tbody>
+        <tr><td>${wC.best}</td>      <td><span class="badge badge-best">★ Best</span></td>           <td>${bC.best}</td></tr>
+        <tr><td>${wC.inaccuracy}</td><td><span class="badge badge-inaccuracy">?! Inaccuracy</span></td><td>${bC.inaccuracy}</td></tr>
+        <tr><td>${wC.mistake}</td>   <td><span class="badge badge-mistake">? Mistake</span></td>     <td>${bC.mistake}</td></tr>
+        <tr><td>${wC.blunder}</td>   <td><span class="badge badge-blunder">?? Blunder</span></td>    <td>${bC.blunder}</td></tr>
+      </tbody>
+    </table>
   `;
   bar.classList.add('visible');
 }

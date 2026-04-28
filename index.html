@@ -633,26 +633,52 @@ function getAudioCtx() {
   return _audioCtx;
 }
 
-function beep(freq, duration, volume = 0.2, type = 'sine', delay = 0) {
+function sqr(ctx, freq, start, duration, volume) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'square';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(volume, start);
+  gain.gain.setValueAtTime(0.001, start + duration);
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.start(start); osc.stop(start + duration + 0.01);
+}
+
+function playMoveSound() {
   try {
     const ctx = getAudioCtx();
-    const t = ctx.currentTime + delay;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = type;
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(volume, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.start(t); osc.stop(t + duration);
+    const t = ctx.currentTime;
+    sqr(ctx, 220, t,        0.04, 0.12);
+    sqr(ctx, 185, t + 0.04, 0.05, 0.08);
   } catch(e) {}
 }
 
-function playMoveSound()    { beep(440, 0.08); }
-function playCaptureSound() { beep(300, 0.1, 0.25); }
-function playCheckSound()   { beep(880, 0.09, 0.2); beep(880, 0.09, 0.2, 'sine', 0.12); }
+function playCaptureSound() {
+  try {
+    const ctx = getAudioCtx();
+    const t = ctx.currentTime;
+    sqr(ctx, 185, t,        0.05, 0.18);
+    sqr(ctx, 140, t + 0.05, 0.08, 0.18);
+  } catch(e) {}
+}
+
+function playCheckSound() {
+  try {
+    const ctx = getAudioCtx();
+    const t = ctx.currentTime;
+    sqr(ctx, 220, t,        0.06, 0.18);
+    sqr(ctx, 294, t + 0.08, 0.06, 0.18);
+    sqr(ctx, 220, t + 0.16, 0.08, 0.18);
+  } catch(e) {}
+}
+
 function playGameOverSound() {
-  [523, 415, 262].forEach((f, i) => beep(f, 0.5, 0.3, 'sine', i * 0.3));
+  try {
+    const ctx = getAudioCtx();
+    const t = ctx.currentTime;
+    const notes = [262, 247, 220, 196, 175, 147, 131];
+    notes.forEach((f, i) => sqr(ctx, f, t + i * 0.09, 0.1, 0.18));
+  } catch(e) {}
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
