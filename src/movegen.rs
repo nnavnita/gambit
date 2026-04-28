@@ -205,7 +205,9 @@ pub fn generate_moves(board: &Board) -> Vec<Move> {
     }
 
     // King
-    let king_sq = board.pieces[us][Piece::King as usize].trailing_zeros() as usize;
+    let king_bb = board.pieces[us][Piece::King as usize];
+    if king_bb == 0 { return moves; }
+    let king_sq = king_bb.trailing_zeros() as usize;
     let mut attacks = ka[king_sq] & !our_occ;
     while attacks != 0 {
         let to = attacks.trailing_zeros() as usize;
