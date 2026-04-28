@@ -1,0 +1,15 @@
+{
+  "name": "gambit",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "gambit_bg.wasm",
+    "gambit.js",
+    "gambit.d.ts"
+  ],
+  "main": "gambit.js",
+  "types": "gambit.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
