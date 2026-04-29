@@ -242,26 +242,23 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── Captured pieces ─────────────────────────── */
-  .captured-row {
+  /* ── Score rows in status panel ─────────────── */
+  .score-row {
     display: flex;
     align-items: center;
-    gap: 1px;
-    min-height: 22px;
-    padding: 2px 0;
-    padding-left: 16px; /* align with board (rank-label width) */
     flex-wrap: wrap;
+    gap: 1px;
+    margin-top: 6px;
+    padding: 4px 6px;
+    background: #2a2a4a;
+    border-radius: 5px;
   }
-  .captured-piece {
-    width: 20px;
-    height: 20px;
-    opacity: 0.85;
-  }
-  .captured-score {
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: #e0e0e0;
+  .score-row img { width: 18px; height: 18px; opacity: 0.9; }
+  .score-row .score-adv {
     margin-left: 4px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #e94560;
   }
 
   /* ── Promotion picker ────────────────────────── */
@@ -348,7 +345,6 @@
 
 <main>
   <div id="board-wrap">
-    <div id="captured-top" class="captured-row"></div>
     <div class="file-labels" id="file-labels">
       <span>a</span><span>b</span><span>c</span><span>d</span>
       <span>e</span><span>f</span><span>g</span><span>h</span>
@@ -360,13 +356,14 @@
       </div>
       <div id="board"></div>
     </div>
-    <div id="captured-bottom" class="captured-row"></div>
   </div>
 
   <div id="sidebar">
     <div class="panel">
       <div class="panel-title">Status</div>
       <div id="status-text">Loading…</div>
+      <div id="score-black" class="score-row" style="display:none;"></div>
+      <div id="score-white" class="score-row" style="display:none;"></div>
     </div>
 
     <div class="panel controls">
@@ -677,53 +674,50 @@ async function doMove(from, to) {
   await triggerEngineMove();
 }
 
-// ── Captured pieces ────────────────────────────────────────────────────────
-function renderCaptured() {
+// renderCaptured delegates to updateScore (board rows removed)
+function renderCaptured() { updateScore(); }
+
+function updateScore() {
   const hist = chess.history({ verbose: true });
+  const order = { q: 9, r: 5, b: 3, n: 3, p: 1 };
   const capturedByWhite = []; // black pieces white took
   const capturedByBlack = []; // white pieces black took
-
   for (const m of hist) {
     if (m.captured) {
       if (m.color === 'w') capturedByWhite.push(m.captured);
       else capturedByBlack.push(m.captured);
     }
   }
+  capturedByWhite.sort((a, b) => (order[b] || 0) - (order[a] || 0));
+  capturedByBlack.sort((a, b) => (order[b] || 0) - (order[a] || 0));
 
-  const order = { q: 9, r: 5, b: 3, n: 3, p: 1 };
-  capturedByWhite.sort((a, b) => order[b] - order[a]);
-  capturedByBlack.sort((a, b) => order[b] - order[a]);
+  const wMat = capturedByWhite.reduce((s, p) => s + (order[p] || 0), 0);
+  const bMat = capturedByBlack.reduce((s, p) => s + (order[p] || 0), 0);
+  const diff = wMat - bMat;
 
-  const wMat = capturedByWhite.reduce((s, p) => s + order[p], 0);
-  const bMat = capturedByBlack.reduce((s, p) => s + order[p], 0);
-  const diff = wMat - bMat; // positive = white ahead
-
-  // not flipped: white at bottom, black at top
-  // flipped: black at bottom, white at top
-  const topPieces    = flipped ? capturedByWhite : capturedByBlack;
-  const topColor     = flipped ? 'b' : 'w';
-  const topAdv       = flipped ? (diff > 0 ? diff : 0) : (diff < 0 ? -diff : 0);
-  const bottomPieces = flipped ? capturedByBlack : capturedByWhite;
-  const bottomColor  = flipped ? 'w' : 'b';
-  const bottomAdv    = flipped ? (diff < 0 ? -diff : 0) : (diff > 0 ? diff : 0);
-
-  fillCapturedRow('captured-top',    topPieces,    topColor,    topAdv);
-  fillCapturedRow('captured-bottom', bottomPieces, bottomColor, bottomAdv);
+  // score-white shows white's captures (+N means white ahead)
+  // green if the player is white (player winning), red if player is black (player losing)
+  fillScoreRow('score-white', capturedByWhite, 'b', diff > 0 ? diff : 0, playerColor === 'w');
+  // score-black shows black's captures (+N means black ahead)
+  // green if the player is black (player winning), red if player is white (player losing)
+  fillScoreRow('score-black', capturedByBlack, 'w', diff < 0 ? -diff : 0, playerColor === 'b');
 }
 
-function fillCapturedRow(id, pieces, color, advantage) {
+function fillScoreRow(id, pieces, color, adv, winning) {
   const el = document.getElementById(id);
+  if (pieces.length === 0 && adv === 0) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
   el.innerHTML = '';
   for (const p of pieces) {
     const img = document.createElement('img');
     img.src = PIECE_URL(color, p);
-    img.className = 'captured-piece';
     el.appendChild(img);
   }
-  if (advantage > 0) {
+  if (adv > 0) {
     const span = document.createElement('span');
-    span.className = 'captured-score';
-    span.textContent = '+' + advantage;
+    span.className = 'score-adv';
+    span.style.color = winning ? '#4caf50' : '#e05555';
+    span.textContent = '+' + adv;
     el.appendChild(span);
   }
 }

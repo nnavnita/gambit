@@ -7,47 +7,28 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♞</text></svg>">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   body {
-    background: #0f0f1a;
-    color: #e0e0e0;
+    background: #0f0f1a; color: #e0e0e0;
     font-family: 'Segoe UI', system-ui, sans-serif;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
   }
-
   header {
-    width: 100%;
-    padding: 16px 24px;
-    background: #1a1a2e;
-    border-bottom: 1px solid #2a2a4a;
-    display: flex;
-    align-items: center;
-    gap: 12px;
+    width: 100%; padding: 16px 24px; background: #1a1a2e;
+    border-bottom: 1px solid #2a2a4a; display: flex; align-items: center; gap: 12px;
   }
   header h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: 0.05em; }
   nav { margin-left: auto; display: flex; gap: 8px; }
   nav a {
-    color: #aaa;
-    text-decoration: none;
-    font-size: 0.85rem;
-    padding: 6px 14px;
-    border-radius: 6px;
-    border: 1px solid #2a2a4a;
+    color: #aaa; text-decoration: none; font-size: 0.85rem;
+    padding: 6px 14px; border-radius: 6px; border: 1px solid #2a2a4a;
     transition: background 0.15s, color 0.15s;
   }
   nav a:hover { background: #2a2a4a; color: #e0e0e0; }
   nav a.active { background: #e94560; color: #fff; border-color: #e94560; }
 
   main {
-    display: flex;
-    gap: 24px;
-    padding: 32px 24px;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    justify-content: center;
+    display: flex; gap: 24px; padding: 32px 24px;
+    align-items: flex-start; flex-wrap: wrap; justify-content: center;
   }
 
   /* ── Board ── */
@@ -58,146 +39,114 @@
   .file-labels { width: 560px; justify-content: space-around; padding: 0 0 0 16px; }
   .file-labels span { width: 70px; text-align: center; }
   #board-row { display: flex; }
-
   #board {
     display: grid;
     grid-template-columns: repeat(8, 70px);
     grid-template-rows: repeat(8, 70px);
-    border: 2px solid #3a3a5a;
-    border-radius: 4px;
-    overflow: hidden;
-    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    border: 2px solid #3a3a5a; border-radius: 4px;
+    overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.6);
   }
-
   .sq {
-    width: 70px; height: 70px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; position: relative;
-    transition: filter 0.1s;
-    user-select: none; -webkit-user-select: none;
+    width: 70px; height: 70px; display: flex; align-items: center;
+    justify-content: center; cursor: pointer; position: relative;
+    transition: filter 0.1s; user-select: none; -webkit-user-select: none;
   }
   .sq img { width: 82%; height: 82%; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
   .sq:hover { filter: brightness(1.15); }
   .sq.light { background: #f0d9b5; }
   .sq.dark  { background: #b58863; }
-  .sq.selected  { background: #7fc97f !important; }
-  .sq.last-move { background: #cdd16e !important; }
-  .sq.check     { background: #e05555 !important; }
-  .sq.correct   { background: #4caf50 !important; }
-  .sq.wrong     { background: #e05555 !important; }
+  .sq.selected   { background: #7fc97f !important; }
+  .sq.last-move  { background: #cdd16e !important; }
+  .sq.check      { background: #e05555 !important; }
+  .sq.correct    { background: #4caf50 !important; }
   .sq.legal-move::after {
-    content: ''; position: absolute;
-    width: 20px; height: 20px;
-    background: rgba(0,0,0,0.25);
-    border-radius: 50%; pointer-events: none;
+    content: ''; position: absolute; width: 20px; height: 20px;
+    background: rgba(0,0,0,0.25); border-radius: 50%; pointer-events: none;
   }
   .sq.legal-capture::after {
     content: ''; position: absolute; inset: 0;
-    border: 5px solid rgba(0,0,0,0.25);
-    pointer-events: none;
+    border: 5px solid rgba(0,0,0,0.25); pointer-events: none;
   }
+
+  /* ── Move progress track ── */
+  #move-track {
+    display: flex; gap: 6px; align-items: center; padding: 4px 0;
+    min-height: 24px;
+  }
+  .track-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #2a2a4a; border: 2px solid #3a3a5a;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .track-dot.done    { background: #4caf50; border-color: #4caf50; }
+  .track-dot.current { background: #e94560; border-color: #e94560; }
 
   /* ── Sidebar ── */
   #sidebar { width: 260px; display: flex; flex-direction: column; gap: 16px; }
-
   .panel {
-    background: #1a1a2e;
-    border: 1px solid #2a2a4a;
-    border-radius: 10px;
-    padding: 16px;
+    background: #1a1a2e; border: 1px solid #2a2a4a;
+    border-radius: 10px; padding: 16px;
   }
-  .panel-title {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: #666;
-    margin-bottom: 10px;
-  }
-
+  .panel-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: #666; margin-bottom: 10px; }
   #puzzle-date { font-size: 0.8rem; color: #666; margin-bottom: 4px; }
   #puzzle-turn { font-size: 1rem; font-weight: 600; }
+  #puzzle-progress { font-size: 0.8rem; color: #888; margin-top: 4px; }
 
-  #status-area {
-    min-height: 2.5em;
-    font-size: 0.9rem;
-    line-height: 1.5;
-  }
+  #status-area { min-height: 2.5em; font-size: 0.9rem; line-height: 1.5; }
   #status-area.correct { color: #4caf50; }
   #status-area.wrong   { color: #e05555; }
   #status-area.info    { color: #888; }
+  #status-area.engine  { color: #f0a500; font-style: italic; }
 
   button {
-    background: #e94560;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    padding: 9px 14px;
-    cursor: pointer;
-    font-size: 0.875rem;
-    font-weight: 600;
-    transition: background 0.15s, transform 0.1s;
-    width: 100%;
+    background: #e94560; color: white; border: none; border-radius: 6px;
+    padding: 9px 14px; cursor: pointer; font-size: 0.875rem; font-weight: 600;
+    transition: background 0.15s, transform 0.1s; width: 100%;
   }
   button:hover  { background: #c73652; }
   button:active { transform: scale(0.97); }
   button.secondary { background: #2a2a4a; color: #c0c0e0; }
   button.secondary:hover { background: #3a3a5a; }
   button:disabled { background: #333; color: #666; cursor: default; transform: none; }
-
   .btn-row { display: flex; gap: 8px; }
   .btn-row button { flex: 1; }
 
-  #solution-moves {
-    display: none;
-    margin-top: 10px;
-    padding: 10px;
-    background: #0f0f1a;
-    border-radius: 6px;
-    font-size: 0.85rem;
-    color: #aaa;
+  /* Solution replay moves */
+  #solution-line {
+    display: none; margin-top: 10px;
+    padding: 10px; background: #0f0f1a;
+    border-radius: 6px; font-size: 0.85rem; line-height: 1.8;
   }
-  #solution-moves.visible { display: block; }
-  #solution-moves span { color: #e0e0e0; font-weight: 600; }
+  #solution-line.visible { display: block; }
+  .sol-player { color: #e0e0e0; font-weight: 700; }
+  .sol-engine { color: #666; }
 
-  /* ── Loading overlay ── */
+  /* Loading states */
   #loading {
-    position: fixed; inset: 0;
-    background: #0f0f1a;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 16px; z-index: 100;
-    font-size: 1rem; color: #888;
+    position: fixed; inset: 0; background: #0f0f1a;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; z-index: 100; font-size: 1rem; color: #888;
   }
   .spinner {
-    width: 40px; height: 40px;
-    border: 3px solid #2a2a4a;
-    border-top-color: #e94560;
-    border-radius: 50%;
+    width: 40px; height: 40px; border: 3px solid #2a2a4a;
+    border-top-color: #e94560; border-radius: 50%;
     animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── Generating overlay (inside page, not fullscreen) ── */
   #generating {
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    padding: 40px;
-    color: #666;
-    font-size: 0.9rem;
-    width: 100%;
+    display: none; flex-direction: column; align-items: center;
+    justify-content: center; gap: 12px; padding: 40px;
+    color: #666; font-size: 0.9rem; width: 100%;
   }
   #generating.visible { display: flex; }
 
-  /* ── Shake animation ── */
   @keyframes shake {
     0%,100% { transform: translateX(0); }
-    20%      { transform: translateX(-6px); }
-    40%      { transform: translateX(6px); }
-    60%      { transform: translateX(-4px); }
-    80%      { transform: translateX(4px); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
   }
   .shake { animation: shake 0.4s ease; }
 
@@ -231,6 +180,7 @@
 
 <main>
   <div id="board-wrap">
+    <div id="move-track"></div>
     <div class="file-labels" id="file-labels">
       <span>a</span><span>b</span><span>c</span><span>d</span>
       <span>e</span><span>f</span><span>g</span><span>h</span>
@@ -253,17 +203,18 @@
       <div class="panel-title">Puzzle of the Day</div>
       <div id="puzzle-date"></div>
       <div id="puzzle-turn"></div>
+      <div id="puzzle-progress"></div>
     </div>
 
     <div class="panel">
       <div class="panel-title">Status</div>
       <div id="status-area" class="info">Find the best move.</div>
-      <div id="solution-moves"></div>
+      <div id="solution-line"></div>
     </div>
 
     <div class="panel">
       <div class="btn-row">
-        <button id="btn-hint" class="secondary">Hint</button>
+        <button id="btn-hint"     class="secondary">Hint</button>
         <button id="btn-solution" class="secondary">Solution</button>
       </div>
       <div style="margin-top:10px">
@@ -276,116 +227,123 @@
 <script type="module">
 import { Chess } from 'https://esm.sh/chess.js@1';
 
-const PIECE_URL = (color, type) =>
-  `https://lichess1.org/assets/piece/cburnett/${color}${type.toUpperCase()}.svg`;
+const PIECE_URL = (c, t) => `https://lichess1.org/assets/piece/cburnett/${c}${t.toUpperCase()}.svg`;
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let chess = null;
-let puzzle = null;         // { fen, solution, solutionSan, turn, gain, isCheck, isCheckmate }
-let puzzleOffset = 0;      // increments for "new puzzle"
-let solved = false;
-let revealed = false;
-let selected = null;
-let legalDests = [];
-let lastMove = null;
-let flipped = false;
+let chess       = null;
+let puzzle      = null;   // { fen, turn, line: [{uci,san,isPlayer,isCheckmate}], gain, isCheckmate }
+let lineIdx     = 0;      // current position in puzzle.line
+let playerMoves = [];     // just the player-move steps, for progress display
+let playerStep  = 0;      // how many player moves solved so far
+let solved      = false;
+let revealed    = false;
+let selected    = null;
+let legalDests  = [];
+let lastMove    = null;
+let flipped     = false;
+let puzzleOffset = 0;
+let enginePlaying = false; // debounce during engine auto-reply
 
-// ── Seeded RNG (same as worker, for generating stable daily seed) ─────────────
+// ── Date seed ─────────────────────────────────────────────────────────────────
 function dateSeed() {
   const d = new Date();
-  // YYYYMMDD as integer
   return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
 }
-
-function puzzleSeed() {
-  return dateSeed() + puzzleOffset * 1000003; // large prime to vary nicely
-}
+function puzzleSeed() { return dateSeed() + puzzleOffset * 1000003; }
 
 // ── Worker ────────────────────────────────────────────────────────────────────
 const worker = new Worker('./puzzle_worker.js', { type: 'module' });
-
 worker.onmessage = (e) => {
   if (e.data.type === 'ready') {
     document.getElementById('loading').style.display = 'none';
     loadPuzzle();
   }
-  if (e.data.type === 'puzzle') {
-    onPuzzleReady(e.data.puzzle);
-  }
-  if (e.data.type === 'error') {
-    showGeneratingText('Failed to generate puzzle. Try "New Puzzle".');
-  }
+  if (e.data.type === 'puzzle') onPuzzleReady(e.data.puzzle);
+  if (e.data.type === 'error')  showGeneratingText('Failed to generate puzzle. Try "New Puzzle".');
 };
+worker.onerror = () => showGeneratingText('Engine error. Please reload.');
 
-worker.onerror = (e) => {
-  console.error('Puzzle worker crashed:', e);
-  showGeneratingText('Engine error. Please reload.');
-};
-
-// ── Load puzzle (cache by date+offset) ───────────────────────────────────────
+// ── Load / cache ──────────────────────────────────────────────────────────────
 function loadPuzzle() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today    = new Date().toISOString().slice(0, 10);
   const cacheKey = `gambit_puzzle_${today}_${puzzleOffset}`;
-  const cached = localStorage.getItem(cacheKey);
+  const cached   = localStorage.getItem(cacheKey);
 
   setGenerating(true, 'Generating puzzle…');
   renderEmptyBoard();
 
   if (cached) {
-    try {
-      onPuzzleReady(JSON.parse(cached));
-      return;
-    } catch(e) {
-      localStorage.removeItem(cacheKey);
-    }
+    try { onPuzzleReady(JSON.parse(cached)); return; }
+    catch(e) { localStorage.removeItem(cacheKey); }
   }
-
   worker.postMessage({ type: 'generate', seed: puzzleSeed() });
 }
 
 function onPuzzleReady(p) {
-  if (!p) {
+  if (!p || !p.line || !p.line.length) {
     showGeneratingText('Could not find a puzzle. Try "New Puzzle".');
     return;
   }
 
-  // Cache it
-  const today = new Date().toISOString().slice(0, 10);
+  const today    = new Date().toISOString().slice(0, 10);
   const cacheKey = `gambit_puzzle_${today}_${puzzleOffset}`;
   try { localStorage.setItem(cacheKey, JSON.stringify(p)); } catch(e) {}
 
-  puzzle = p;
-  solved = false;
-  revealed = false;
-  selected = null;
+  puzzle    = p;
+  lineIdx   = 0;
+  playerMoves = p.line.filter(m => m.isPlayer);
+  playerStep  = 0;
+  solved    = false;
+  revealed  = false;
+  selected  = null;
   legalDests = [];
-  lastMove = null;
-  flipped = p.turn === 'b'; // flip board so solver plays from bottom
+  lastMove  = null;
+  flipped   = p.turn === 'b';
+  enginePlaying = false;
 
   chess = new Chess();
   chess.load(p.fen);
 
   setGenerating(false);
   renderPuzzleInfo();
+  renderTrack();
   renderBoard();
   updateStatus('Find the best move.', 'info');
   resetButtons();
+  document.getElementById('solution-line').classList.remove('visible');
+  document.getElementById('solution-line').innerHTML = '';
 }
 
 // ── Puzzle info ───────────────────────────────────────────────────────────────
 function renderPuzzleInfo() {
-  const dateEl = document.getElementById('puzzle-date');
-  const turnEl = document.getElementById('puzzle-turn');
-
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-  dateEl.textContent = puzzleOffset === 0 ? today : `Puzzle #${puzzleOffset + 1} — ${today}`;
+  document.getElementById('puzzle-date').textContent =
+    puzzleOffset === 0 ? today : `Puzzle #${puzzleOffset + 1} — ${today}`;
 
   const color = puzzle.turn === 'w' ? 'White' : 'Black';
-  const gainDesc = puzzle.isCheckmate ? ' — find the checkmate'
-    : puzzle.isCheck ? ' — find the check'
-    : puzzle.gain > 400 ? ' — win material'
+  const suffix = puzzle.isCheckmate ? ' — find checkmate'
+    : puzzle.gain > 600 ? ' — win material decisively'
+    : puzzle.gain > 200 ? ' — find the tactic'
     : '';
-  turnEl.textContent = `${color} to move${gainDesc}`;
+  document.getElementById('puzzle-turn').textContent = `${color} to move${suffix}`;
+  updateProgress();
+}
+
+function updateProgress() {
+  const total = playerMoves.length;
+  document.getElementById('puzzle-progress').textContent =
+    total > 1 ? `Move ${Math.min(playerStep + 1, total)} of ${total}` : '';
+}
+
+// ── Move progress dots ────────────────────────────────────────────────────────
+function renderTrack() {
+  const track = document.getElementById('move-track');
+  track.innerHTML = '';
+  playerMoves.forEach((_, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'track-dot' + (i < playerStep ? ' done' : i === playerStep ? ' current' : '');
+    track.appendChild(dot);
+  });
 }
 
 // ── Board rendering ───────────────────────────────────────────────────────────
@@ -393,14 +351,13 @@ function renderBoard() {
   if (!chess) return;
   const boardEl = document.getElementById('board');
   boardEl.innerHTML = '';
-
   const inCheckSq = chess.inCheck() ? kingSquare(chess.turn()) : null;
 
   for (let vr = 0; vr < 8; vr++) {
     for (let vc = 0; vc < 8; vc++) {
       const rank = flipped ? vr + 1 : 8 - vr;
       const file = flipped ? 8 - vc : vc + 1;
-      const sq = 'abcdefgh'[file - 1] + rank;
+      const sq   = 'abcdefgh'[file - 1] + rank;
 
       const div = document.createElement('div');
       div.className = 'sq ' + ((rank + file) % 2 === 0 ? 'dark' : 'light');
@@ -409,25 +366,22 @@ function renderBoard() {
       if (sq === selected) div.classList.add('selected');
       else if (lastMove && (sq === lastMove.from || sq === lastMove.to)) div.classList.add('last-move');
       if (sq === inCheckSq) div.classList.add('check');
-
-      if (legalDests.includes(sq)) {
-        div.classList.add(chess.get(sq) ? 'legal-capture' : 'legal-move');
-      }
+      if (legalDests.includes(sq)) div.classList.add(chess.get(sq) ? 'legal-capture' : 'legal-move');
 
       const piece = chess.get(sq);
       if (piece) {
         const img = document.createElement('img');
-        img.src = PIECE_URL(piece.color, piece.type);
-        img.alt = piece.color + piece.type;
+        img.src  = PIECE_URL(piece.color, piece.type);
+        img.alt  = piece.color + piece.type;
         div.appendChild(img);
       }
 
-      if (!solved && !revealed) div.onclick = () => onSquareClick(sq);
+      const interactive = !solved && !revealed && !enginePlaying && chess.turn() === puzzle?.turn;
+      if (interactive) div.onclick = () => onSquareClick(sq);
       boardEl.appendChild(div);
     }
   }
 
-  // Coord labels
   const files = flipped ? ['h','g','f','e','d','c','b','a'] : ['a','b','c','d','e','f','g','h'];
   const ranks = flipped ? ['1','2','3','4','5','6','7','8'] : ['8','7','6','5','4','3','2','1'];
   document.querySelectorAll('#file-labels span').forEach((el, i) => el.textContent = files[i]);
@@ -439,64 +393,70 @@ function renderEmptyBoard() {
   boardEl.innerHTML = '';
   for (let i = 0; i < 64; i++) {
     const div = document.createElement('div');
-    const rank = Math.floor(i / 8) + 1;
-    const file = (i % 8) + 1;
-    div.className = 'sq ' + ((rank + file) % 2 === 0 ? 'dark' : 'light');
+    div.className = 'sq ' + ((Math.floor(i/8) + i%8) % 2 === 0 ? 'light' : 'dark');
     boardEl.appendChild(div);
   }
 }
 
-// ── Click logic ───────────────────────────────────────────────────────────────
+// ── Click & move logic ────────────────────────────────────────────────────────
 function onSquareClick(sq) {
-  if (!chess || solved || revealed) return;
-  if (chess.turn() !== puzzle.turn) return; // shouldn't happen but guard
+  if (!chess || !puzzle || solved || revealed || enginePlaying) return;
+  if (chess.turn() !== puzzle.turn) return;
 
   const piece = chess.get(sq);
 
   if (selected && legalDests.includes(sq)) {
-    attemptMove(selected, sq);
+    attemptPlayerMove(selected, sq);
     return;
   }
-
   if (piece && piece.color === puzzle.turn) {
-    selected = sq;
+    selected   = sq;
     legalDests = chess.moves({ square: sq, verbose: true }).map(m => m.to);
     renderBoard();
     return;
   }
-
-  selected = null;
+  selected   = null;
   legalDests = [];
   renderBoard();
 }
 
-function attemptMove(from, to) {
-  const uci = from + to;
-  const solUci = puzzle.solution.slice(0, 4);
+function attemptPlayerMove(from, to) {
+  const step = puzzle.line[lineIdx];
+  if (!step || !step.isPlayer) return;
 
-  // Apply move
+  const correctUci = step.uci.slice(0, 4);
+  const playedUci  = from + to;
+
+  // Apply move temporarily to validate
   let moveObj;
-  try {
-    moveObj = chess.move({ from, to, promotion: 'q' });
-  } catch(e) { return; }
+  try { moveObj = chess.move({ from, to, promotion: step.uci[4] || 'q' }); }
+  catch(e) { return; }
   if (!moveObj) return;
 
-  lastMove = { from, to };
-  selected = null;
-  legalDests = [];
+  if (playedUci === correctUci) {
+    // Correct player move
+    lastMove   = { from, to };
+    selected   = null;
+    legalDests = [];
+    lineIdx++;
+    playerStep++;
+    renderTrack();
+    updateProgress();
 
-  if (uci === solUci) {
-    // Correct!
-    solved = true;
-    renderBoard();
-    highlightCorrect(to);
-    updateStatus('Correct! Well played.', 'correct');
-    document.getElementById('btn-hint').disabled = true;
-    document.getElementById('btn-solution').disabled = true;
+    if (lineIdx >= puzzle.line.length) {
+      // All moves done — puzzle solved
+      finishPuzzle(from, to);
+    } else {
+      // Engine responds next
+      renderBoard();
+      updateStatus('Good move! Engine responds…', 'engine');
+      enginePlaying = true;
+      setTimeout(() => playEngineMove(), 700);
+    }
   } else {
-    // Wrong — undo and shake
+    // Wrong — undo
     chess.undo();
-    lastMove = null;
+    lastMove   = null;
     renderBoard();
     shakeBoard();
     updateStatus('Not the best move. Try again.', 'wrong');
@@ -504,24 +464,55 @@ function attemptMove(from, to) {
   }
 }
 
-function highlightCorrect(sq) {
-  const el = document.querySelector(`[data-sq="${sq}"]`);
-  if (el) { el.classList.remove('last-move'); el.classList.add('correct'); }
+function playEngineMove() {
+  const step = puzzle.line[lineIdx];
+  if (!step || step.isPlayer) { enginePlaying = false; renderBoard(); return; }
+
+  try {
+    const moveObj = chess.move({ from: step.uci.slice(0,2), to: step.uci.slice(2,4), promotion: step.uci[4] || 'q' });
+    if (moveObj) lastMove = { from: step.uci.slice(0,2), to: step.uci.slice(2,4) };
+  } catch(e) {}
+
+  lineIdx++;
+  enginePlaying = false;
+
+  if (lineIdx >= puzzle.line.length) {
+    finishPuzzle(lastMove?.from, lastMove?.to);
+  } else {
+    renderBoard();
+    updateStatus('Your turn — find the next move.', 'info');
+  }
 }
 
-function shakeBoard() {
-  const boardEl = document.getElementById('board');
-  boardEl.classList.remove('shake');
-  void boardEl.offsetWidth; // reflow
-  boardEl.classList.add('shake');
+function finishPuzzle(from, to) {
+  solved = true;
+  selected = null;
+  legalDests = [];
+  renderBoard();
+  // Light up destination square green
+  setTimeout(() => {
+    const dest = puzzle.line[puzzle.line.length - 1]?.uci.slice(2, 4);
+    const el = dest && document.querySelector(`[data-sq="${dest}"]`);
+    if (el) { el.classList.remove('last-move'); el.classList.add('correct'); }
+  }, 50);
+
+  const msg = puzzle.line[puzzle.line.length - 1]?.isCheckmate
+    ? 'Checkmate! Brilliant solve.'
+    : playerMoves.length > 1
+      ? `Solved in ${playerMoves.length} moves!`
+      : 'Correct! Well played.';
+  updateStatus(msg, 'correct');
+  document.getElementById('btn-hint').disabled = true;
+  document.getElementById('btn-solution').disabled = true;
 }
 
 // ── Hint / Solution ───────────────────────────────────────────────────────────
 document.getElementById('btn-hint').onclick = () => {
-  if (!puzzle) return;
-  const from = puzzle.solution.slice(0, 2);
-  // Highlight the piece to move
-  selected = from;
+  if (!puzzle || solved || revealed) return;
+  const step = puzzle.line[lineIdx];
+  if (!step || !step.isPlayer) return;
+  const from = step.uci.slice(0, 2);
+  selected   = from;
   legalDests = chess ? chess.moves({ square: from, verbose: true }).map(m => m.to) : [];
   renderBoard();
   updateStatus(`Hint: move the piece on ${from.toUpperCase()}.`, 'info');
@@ -529,29 +520,54 @@ document.getElementById('btn-hint').onclick = () => {
 
 document.getElementById('btn-solution').onclick = () => {
   if (!puzzle) return;
-  revealed = true;
-  document.getElementById('btn-hint').disabled = true;
+  revealed  = true;
+  enginePlaying = false;
+  selected  = null;
+  legalDests = [];
+  document.getElementById('btn-hint').disabled     = true;
   document.getElementById('btn-solution').disabled = true;
 
-  // Show solution on board
-  const from = puzzle.solution.slice(0, 2);
-  const to   = puzzle.solution.slice(2, 4);
-  lastMove = { from, to };
-  selected = null;
-  legalDests = [];
-  renderBoard();
-  highlightCorrect(to);
+  // Replay full line on board (show last player move highlighted)
+  const tempChess = new Chess();
+  tempChess.load(puzzle.fen);
+  let lastPlayerFrom, lastPlayerTo;
+  for (const m of puzzle.line) {
+    try { tempChess.move({ from: m.uci.slice(0,2), to: m.uci.slice(2,4), promotion: m.uci[4] || 'q' }); } catch(e) {}
+    if (m.isPlayer) { lastPlayerFrom = m.uci.slice(0,2); lastPlayerTo = m.uci.slice(2,4); }
+  }
 
-  // Show SAN
-  const solutionEl = document.getElementById('solution-moves');
-  solutionEl.innerHTML = `Best move: <span>${puzzle.solutionSan}</span>`;
-  solutionEl.classList.add('visible');
+  // Show final board state
+  chess = tempChess;
+  lastMove = lastPlayerFrom ? { from: lastPlayerFrom, to: lastPlayerTo } : null;
+  renderBoard();
+
+  // Show move list
+  const lineEl = document.getElementById('solution-line');
+  let html = '<b>Solution:</b><br>';
+  let moveNum = 1;
+  let i = 0;
+  while (i < puzzle.line.length) {
+    const wm = puzzle.line[i];
+    const bm = puzzle.line[i + 1];
+    if (wm?.isPlayer) {
+      html += `${moveNum}. <span class="sol-player">${wm.san}</span>`;
+      if (bm && !bm.isPlayer) html += ` <span class="sol-engine">${bm.san}</span>`;
+      html += ' ';
+      i += bm && !bm.isPlayer ? 2 : 1;
+    } else {
+      html += `${moveNum}. … <span class="sol-engine">${wm.san}</span> `;
+      i++;
+    }
+    moveNum++;
+  }
+  lineEl.innerHTML = html;
+  lineEl.classList.add('visible');
   updateStatus('Solution revealed.', 'info');
 };
 
 document.getElementById('btn-next').onclick = () => {
   puzzleOffset++;
-  document.getElementById('solution-moves').classList.remove('visible');
+  document.getElementById('solution-line').classList.remove('visible');
   loadPuzzle();
 };
 
@@ -563,29 +579,32 @@ function updateStatus(msg, cls) {
 }
 
 function setGenerating(active, msg) {
-  const el = document.getElementById('generating');
-  const boardEl = document.getElementById('board');
-  el.classList.toggle('visible', active);
-  boardEl.style.display = active ? 'none' : 'grid';
+  document.getElementById('generating').classList.toggle('visible', active);
+  document.getElementById('board').style.display = active ? 'none' : 'grid';
+  document.getElementById('move-track').style.display = active ? 'none' : 'flex';
   if (msg) document.getElementById('generating-text').textContent = msg;
 }
 
 function showGeneratingText(msg) {
   setGenerating(true, msg);
-  document.querySelector('#generating .spinner').style.display = 'none';
+  const sp = document.querySelector('#generating .spinner');
+  if (sp) sp.style.display = 'none';
 }
 
 function resetButtons() {
-  document.getElementById('btn-hint').disabled = false;
+  document.getElementById('btn-hint').disabled     = false;
   document.getElementById('btn-solution').disabled = false;
 }
 
+function shakeBoard() {
+  const el = document.getElementById('board');
+  el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
+}
+
 function kingSquare(color) {
-  for (const f of 'abcdefgh') {
-    for (const r of '12345678') {
-      const p = chess.get(f + r);
-      if (p && p.type === 'k' && p.color === color) return f + r;
-    }
+  for (const f of 'abcdefgh') for (const r of '12345678') {
+    const p = chess.get(f + r);
+    if (p && p.type === 'k' && p.color === color) return f + r;
   }
   return null;
 }
