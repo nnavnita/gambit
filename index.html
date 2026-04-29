@@ -242,6 +242,74 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* ── Captured pieces ─────────────────────────── */
+  .captured-row {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    min-height: 22px;
+    padding: 2px 0;
+    padding-left: 16px; /* align with board (rank-label width) */
+    flex-wrap: wrap;
+  }
+  .captured-piece {
+    width: 20px;
+    height: 20px;
+    opacity: 0.85;
+  }
+  .captured-score {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #e0e0e0;
+    margin-left: 4px;
+  }
+
+  /* ── Promotion picker ────────────────────────── */
+  #promo-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+  }
+  #promo-box {
+    background: #1a1a2e;
+    border: 1px solid #3a3a5a;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  #promo-box h3 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #888;
+  }
+  #promo-pieces {
+    display: flex;
+    gap: 8px;
+  }
+  .promo-piece {
+    width: 64px;
+    height: 64px;
+    background: #2a2a4a;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    padding: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .promo-piece:hover { background: #3a3a5a; border-color: #e94560; }
+  .promo-piece img { width: 100%; height: 100%; }
+
   @media (max-width: 640px) {
     main { padding: 16px 8px; gap: 16px; }
     #board { grid-template-columns: repeat(8, 44px); grid-template-rows: repeat(8, 44px); }
@@ -254,6 +322,14 @@
 </style>
 </head>
 <body>
+
+<!-- Promotion picker -->
+<div id="promo-overlay">
+  <div id="promo-box">
+    <h3>Promote pawn</h3>
+    <div id="promo-pieces"></div>
+  </div>
+</div>
 
 <div id="loading">
   <div class="spinner"></div>
@@ -271,6 +347,7 @@
 
 <main>
   <div id="board-wrap">
+    <div id="captured-top" class="captured-row"></div>
     <div class="file-labels" id="file-labels">
       <span>a</span><span>b</span><span>c</span><span>d</span>
       <span>e</span><span>f</span><span>g</span><span>h</span>
@@ -282,6 +359,7 @@
       </div>
       <div id="board"></div>
     </div>
+    <div id="captured-bottom" class="captured-row"></div>
   </div>
 
   <div id="sidebar">
@@ -352,11 +430,13 @@ worker.onmessage = (e) => {
 worker.onerror = (e) => {
   console.error('Engine worker crashed:', e);
   if (pendingMoveResolve) {
-    pendingMoveResolve('');   // unblock doMove with empty move
+    pendingMoveResolve('');
     pendingMoveResolve = null;
   }
   thinking = false;
-  updateStatus();
+  const el = document.getElementById('status-text');
+  el.className = 'lose';
+  el.innerHTML = 'Engine crashed. <a href="" style="color:#e94560">Reload</a> to restart.';
 };
 
 function engineMove(fen, d) {
@@ -384,6 +464,7 @@ function startGame() {
   thinking = false;
   flipped = playerColor === 'b';
   renderBoard();
+  renderCaptured();
   updateStatus();
   renderHistory();
   updateColorButtons();
@@ -415,6 +496,7 @@ document.getElementById('btn-black').onclick = () => {
 document.getElementById('btn-flip').onclick = () => {
   flipped = !flipped;
   renderBoard();
+  renderCaptured();
 };
 
 const depthSlider = document.getElementById('depth-slider');
@@ -536,12 +618,43 @@ async function triggerEngineMove() {
 
   renderBoard();
   renderHistory();
+  renderCaptured();
   updateStatus();
 }
 
+function isPromotionMove(from, to) {
+  const piece = chess.get(from);
+  if (!piece || piece.type !== 'p') return false;
+  const toRank = parseInt(to[1]);
+  return (piece.color === 'w' && toRank === 8) || (piece.color === 'b' && toRank === 1);
+}
+
+function pickPromotion(color) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('promo-overlay');
+    const container = document.getElementById('promo-pieces');
+    container.innerHTML = '';
+    for (const p of ['q', 'r', 'b', 'n']) {
+      const btn = document.createElement('button');
+      btn.className = 'promo-piece';
+      const img = document.createElement('img');
+      img.src = PIECE_URL(color, p);
+      img.alt = p;
+      btn.appendChild(img);
+      btn.onclick = () => { overlay.style.display = 'none'; resolve(p); };
+      container.appendChild(btn);
+    }
+    overlay.style.display = 'flex';
+  });
+}
+
 async function doMove(from, to) {
-  // Try move (promote to queen by default)
-  const move = chess.move({ from, to, promotion: 'q' });
+  let promotion = 'q';
+  if (isPromotionMove(from, to)) {
+    promotion = await pickPromotion(playerColor);
+  }
+
+  const move = chess.move({ from, to, promotion });
   if (!move) return;
 
   lastMove = { from, to };
@@ -555,11 +668,63 @@ async function doMove(from, to) {
 
   renderBoard();
   renderHistory();
+  renderCaptured();
   updateStatus();
 
   if (chess.isGameOver()) return;
 
   await triggerEngineMove();
+}
+
+// ── Captured pieces ────────────────────────────────────────────────────────
+function renderCaptured() {
+  const hist = chess.history({ verbose: true });
+  const capturedByWhite = []; // black pieces white took
+  const capturedByBlack = []; // white pieces black took
+
+  for (const m of hist) {
+    if (m.captured) {
+      if (m.color === 'w') capturedByWhite.push(m.captured);
+      else capturedByBlack.push(m.captured);
+    }
+  }
+
+  const order = { q: 9, r: 5, b: 3, n: 3, p: 1 };
+  capturedByWhite.sort((a, b) => order[b] - order[a]);
+  capturedByBlack.sort((a, b) => order[b] - order[a]);
+
+  const wMat = capturedByWhite.reduce((s, p) => s + order[p], 0);
+  const bMat = capturedByBlack.reduce((s, p) => s + order[p], 0);
+  const diff = wMat - bMat; // positive = white ahead
+
+  // not flipped: white at bottom, black at top
+  // flipped: black at bottom, white at top
+  const topPieces    = flipped ? capturedByWhite : capturedByBlack;
+  const topColor     = flipped ? 'b' : 'w';
+  const topAdv       = flipped ? (diff > 0 ? diff : 0) : (diff < 0 ? -diff : 0);
+  const bottomPieces = flipped ? capturedByBlack : capturedByWhite;
+  const bottomColor  = flipped ? 'w' : 'b';
+  const bottomAdv    = flipped ? (diff < 0 ? -diff : 0) : (diff > 0 ? diff : 0);
+
+  fillCapturedRow('captured-top',    topPieces,    topColor,    topAdv);
+  fillCapturedRow('captured-bottom', bottomPieces, bottomColor, bottomAdv);
+}
+
+function fillCapturedRow(id, pieces, color, advantage) {
+  const el = document.getElementById(id);
+  el.innerHTML = '';
+  for (const p of pieces) {
+    const img = document.createElement('img');
+    img.src = PIECE_URL(color, p);
+    img.className = 'captured-piece';
+    el.appendChild(img);
+  }
+  if (advantage > 0) {
+    const span = document.createElement('span');
+    span.className = 'captured-score';
+    span.textContent = '+' + advantage;
+    el.appendChild(span);
+  }
 }
 
 // ── Status ─────────────────────────────────────────────────────────────────

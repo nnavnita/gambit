@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gambit · Analysis</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♞</text></svg>">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -77,7 +78,12 @@
   }
   button:hover { background: #c73652; }
   button:disabled { background: #444; cursor: default; }
-  #fetch-status { font-size: 0.8rem; color: #888; }
+  #fetch-status { font-size: 0.8rem; color: #888; display: flex; align-items: center; gap: 6px; }
+  .fetch-spinner {
+    display: inline-block; width: 12px; height: 12px;
+    border: 2px solid #2a2a4a; border-top-color: #e94560;
+    border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0;
+  }
 
   /* ── Main layout ── */
   #main {
@@ -562,7 +568,7 @@
 </div>
 
 <header>
-  <img src="https://lichess1.org/assets/piece/cburnett/bN.svg" alt="knight">
+  <img src="https://lichess1.org/assets/piece/cburnett/wN.svg" alt="knight">
   <h1>Gambit</h1>
   <nav>
     <a href="index.html">Play</a>
@@ -651,21 +657,36 @@ async function fetchGames() {
   if (!username) return;
 
   analysisUsername = username.toLowerCase();
-  const btn = document.getElementById('fetch-btn');
+  const btn    = document.getElementById('fetch-btn');
   const status = document.getElementById('fetch-status');
   btn.disabled = true;
-  status.textContent = 'Fetching…';
+  status.innerHTML = '<span class="fetch-spinner"></span> Fetching…';
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
 
   try {
     const url = `https://api.chess.com/pub/player/${username}/games/${year}/${month}`;
-    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const res = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (res.status === 404) throw new Error(`Player "${username}" not found`);
+    if (!res.ok) throw new Error(`chess.com returned ${res.status}`);
     const data = await res.json();
     const games = (data.games || []).filter(g => g.rules === 'chess').reverse();
     status.textContent = `${games.length} game${games.length !== 1 ? 's' : ''} found`;
     renderGameList(games, username.toLowerCase());
   } catch (err) {
-    status.textContent = `Error: ${err.message}`;
+    clearTimeout(timeout);
+    if (err.name === 'AbortError') {
+      status.textContent = 'Request timed out — chess.com may be slow, try again';
+    } else if (err.message === 'Failed to fetch') {
+      status.textContent = 'Could not reach chess.com — check your connection or try again';
+    } else {
+      status.textContent = err.message;
+    }
     console.error(err);
   }
   btn.disabled = false;
@@ -825,12 +846,32 @@ evalWorker.onmessage = (e) => {
     drainEvalQueue();
   }
 };
+let evalWorkerCrashes = 0;
 evalWorker.onerror = (e) => {
   console.error('Eval worker error:', e);
-  if (pendingEvalResolve) { pendingEvalResolve({ score: 0, bestMove: '' }); pendingEvalResolve = null; }
+  evalWorkerCrashes++;
+  if (pendingEvalResolve) { pendingEvalResolve(null); pendingEvalResolve = null; }
   evalBusy = false;
-  drainEvalQueue();
+  if (evalWorkerCrashes >= 2) {
+    evalQueue.forEach(item => item.resolve(null));
+    evalQueue.length = 0;
+    showEngineError();
+  } else {
+    drainEvalQueue();
+  }
 };
+
+function showEngineError() {
+  const area = document.getElementById('analysis-area');
+  if (!area || document.getElementById('engine-error-banner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'engine-error-banner';
+  banner.style.cssText = 'background:#3a1a1a;color:#e05555;padding:12px 16px;font-size:0.85rem;border-bottom:1px solid #5a2a2a;display:flex;align-items:center;gap:10px;';
+  banner.innerHTML = '⚠ Engine crashed — analysis unavailable. <button onclick="location.reload()" style="margin-left:auto;background:#e94560;color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:0.8rem;">Reload</button>';
+  area.prepend(banner);
+  const progressWrap = document.getElementById('progress-wrap');
+  if (progressWrap) progressWrap.classList.remove('visible');
+}
 
 function drainEvalQueue() {
   if (evalBusy || evalQueue.length === 0) return;
