@@ -6,7 +6,8 @@ init().then(() => {
   engine = new Engine();
   postMessage({ type: 'ready' });
 }).catch(err => {
-  console.error('Engine init failed:', err);
+  console.error('WASM init failed:', err);
+  postMessage({ type: 'init_error', message: String(err) });
 });
 
 onmessage = (e) => {

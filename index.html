@@ -422,10 +422,17 @@ worker.onmessage = (e) => {
     pendingMoveResolve(e.data.move);
     pendingMoveResolve = null;
   }
+  if (e.data.type === 'init_error') {
+    console.error('WASM init error:', e.data.message);
+    document.getElementById('loading').style.display = 'none';
+    const el = document.getElementById('status-text');
+    el.className = 'lose';
+    el.textContent = 'Engine failed to load: ' + e.data.message;
+  }
 };
 
 worker.onerror = (e) => {
-  console.error('Engine worker crashed:', e);
+  console.error('Engine worker crashed:', e.message || '(no message)', 'file:', e.filename, 'line:', e.lineno, e);
   if (pendingMoveResolve) {
     pendingMoveResolve('');
     pendingMoveResolve = null;
