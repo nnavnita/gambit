@@ -179,18 +179,10 @@
   }
   button.secondary:hover { background: #3a3a5a; }
 
-  .depth-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 0.85rem;
-    color: #aaa;
+  .difficulty-btn.active {
+    outline: 2px solid #e94560;
+    outline-offset: 2px;
   }
-  input[type=range] {
-    flex: 1;
-    accent-color: #e94560;
-  }
-  #depth-val { min-width: 14px; text-align: right; color: #e0e0e0; font-weight: 600; }
 
   .panel-title {
     font-size: 0.7rem;
@@ -377,10 +369,13 @@
         </div>
       </div>
       <button id="btn-flip" class="secondary">Flip Board</button>
-      <div class="depth-row">
-        <span>Depth</span>
-        <input type="range" id="depth-slider" min="1" max="6" value="3">
-        <span id="depth-val">3</span>
+      <div>
+        <div class="panel-title" style="margin-bottom:6px">Difficulty</div>
+        <div style="display:flex;gap:6px;">
+          <button id="btn-beginner"     class="secondary difficulty-btn" style="flex:1;font-size:0.75rem;padding:7px 2px;">Baby Gambit</button>
+          <button id="btn-intermediate" class="secondary difficulty-btn active" style="flex:1;font-size:0.75rem;padding:7px 2px;">Gambit</button>
+          <button id="btn-advanced"     class="secondary difficulty-btn" style="flex:1;font-size:0.75rem;padding:7px 2px;">Dark Gambit</button>
+        </div>
       </div>
     </div>
 
@@ -401,9 +396,13 @@ let selected = null;
 let legalDests = [];
 let lastMove = null;
 let thinking = false;
-let depth = 3;
+let difficulty = 'intermediate'; // 'beginner' | 'intermediate' | 'advanced'
 let pendingMoveResolve = null;
 let playerColor = 'w'; // 'w' or 'b'
+
+const DIFFICULTY_DEPTH = { beginner: 1, intermediate: 3, advanced: 6 };
+// Beginner: 35% of moves are random (simulates blundering)
+const DIFFICULTY_RANDOM_RATE = { beginner: 0.35, intermediate: 0, advanced: 0 };
 
 // Lichess open-source piece set (cburnett, MIT licence)
 const PIECE_URL = (color, type) =>
@@ -497,12 +496,15 @@ document.getElementById('btn-flip').onclick = () => {
   renderCaptured();
 };
 
-const depthSlider = document.getElementById('depth-slider');
-const depthVal    = document.getElementById('depth-val');
-depthSlider.oninput = () => {
-  depth = parseInt(depthSlider.value);
-  depthVal.textContent = depth;
-};
+function setDifficulty(d) {
+  difficulty = d;
+  document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + d).classList.add('active');
+}
+
+document.getElementById('btn-beginner').onclick     = () => setDifficulty('beginner');
+document.getElementById('btn-intermediate').onclick = () => setDifficulty('intermediate');
+document.getElementById('btn-advanced').onclick     = () => setDifficulty('advanced');
 
 // ── Board rendering ────────────────────────────────────────────────────────
 function renderBoard() {
@@ -593,7 +595,18 @@ async function triggerEngineMove() {
   updateStatus();
   renderBoard();
 
-  const uciMove = await engineMove(chess.fen(), depth);
+  const depth = DIFFICULTY_DEPTH[difficulty];
+
+  // Beginner: occasionally play a random legal move instead of the engine's choice
+  let uciMove;
+  if (Math.random() < DIFFICULTY_RANDOM_RATE[difficulty]) {
+    const legalMoves = chess.moves({ verbose: true });
+    if (legalMoves.length > 0) {
+      const r = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+      uciMove = r.from + r.to + (r.promotion || '');
+    }
+  }
+  uciMove = uciMove || await engineMove(chess.fen(), depth);
   thinking = false;
 
   if (uciMove && uciMove.length >= 4 && uciMove.slice(0,2) !== uciMove.slice(2,4)) {
@@ -729,7 +742,8 @@ function updateStatus() {
 
   if (thinking) {
     el.className = 'thinking thinking-dots';
-    el.textContent = 'Gambit is thinking';
+    const botName = { beginner: 'Baby Gambit', intermediate: 'Gambit', advanced: 'Dark Gambit' }[difficulty];
+    el.textContent = botName + ' is thinking';
     return;
   }
   if (chess.isCheckmate()) {
@@ -751,7 +765,8 @@ function updateStatus() {
     el.textContent = (chess.turn() === 'w' ? 'White' : 'Black') + ' is in check!';
     return;
   }
-  el.textContent = chess.turn() === playerColor ? 'Your turn' : 'Gambit thinking…';
+  const botName = { beginner: 'Baby Gambit', intermediate: 'Gambit', advanced: 'Dark Gambit' }[difficulty];
+  el.textContent = chess.turn() === playerColor ? 'Your turn' : botName + ' thinking…';
 }
 
 // ── History ────────────────────────────────────────────────────────────────
