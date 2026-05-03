@@ -39,8 +39,6 @@ pub struct ZobristKeys {
 
 pub fn zobrist() -> &'static ZobristKeys {
     ZOBRIST.get_or_init(|| {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
         let mut seed: u64 = 0x123456789ABCDEF0;
         let mut next = || -> u64 {
             seed ^= seed << 13;
@@ -60,6 +58,7 @@ pub fn zobrist() -> &'static ZobristKeys {
 }
 
 impl Board {
+    #[allow(dead_code)]
     pub fn startpos() -> Board {
         Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
     }

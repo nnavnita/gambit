@@ -55,8 +55,6 @@ impl Move {
         }
     }
 
-    pub fn is_null(self) -> bool { self.0 == 0 }
-
     /// UCI string e.g. "e2e4", "e7e8q"
     pub fn to_uci(self) -> String {
         let from = self.from();

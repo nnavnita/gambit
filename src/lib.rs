@@ -9,7 +9,6 @@ use wasm_bindgen::prelude::*;
 use board::Board;
 use movegen::{init_attacks, legal_moves};
 use search::{Searcher, SearchInfo};
-use types::Move;
 
 #[wasm_bindgen]
 pub struct Engine {

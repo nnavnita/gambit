@@ -57,6 +57,7 @@ const FILE_H: Bitboard = FILE_A << 7;
 
 // ── Slider attacks (classical fill) ──────────────────────────────────────────
 
+#[allow(dead_code)]
 fn ray(sq: usize, dir: i32, occ: Bitboard, blocker_mask: Bitboard) -> Bitboard {
     let mut result = 0u64;
     let mut s = sq as i32 + dir;
@@ -73,6 +74,10 @@ fn ray(sq: usize, dir: i32, occ: Bitboard, blocker_mask: Bitboard) -> Bitboard {
         s += dir;
     }
     result & blocker_mask
+}
+
+pub fn knight_attacks(sq: usize) -> Bitboard {
+    KNIGHT_ATTACKS.get().unwrap()[sq]
 }
 
 pub fn rook_attacks(sq: usize, occ: Bitboard) -> Bitboard {
@@ -95,7 +100,7 @@ fn slide_ray(sq: usize, dir: i32, occ: Bitboard) -> Bitboard {
     let mut result = 0u64;
     let mut s = sq as i32;
     loop {
-        let prev_file = (s % 8) as i32;
+        let _prev_file = (s % 8) as i32;
         s += dir;
         if s < 0 || s >= 64 { break; }
         let f = (s % 8) as i32;
@@ -144,7 +149,7 @@ pub fn generate_moves(board: &Board) -> Vec<Move> {
     let them = 1 - us;
     let occ = board.all;
     let our_occ = board.occ[us];
-    let their_occ = board.occ[them];
+    let _their_occ = board.occ[them];
 
     let ka = KING_ATTACKS.get().unwrap();
     let na = KNIGHT_ATTACKS.get().unwrap();
@@ -229,16 +234,16 @@ fn gen_pawn_moves(board: &Board, moves: &mut Vec<Move>) {
     let pawns = board.pieces[us][Piece::Pawn as usize];
     let pa = PAWN_ATTACKS.get().unwrap();
 
-    let (push1, push2_rank, promo_rank, start_rank): (fn(u64) -> u64, u64, u64, u64) = if us == 0 {
+    let (push1, _push2_rank, promo_rank, start_rank): (fn(u64) -> u64, u64, u64, u64) = if us == 0 {
         (|bb| bb << 8, 0x00000000FF000000, 0xFF00000000000000, 0x000000000000FF00)
     } else {
         (|bb| bb >> 8, 0x000000FF00000000, 0x00000000000000FF, 0x00FF000000000000)
     };
 
     // Single push
-    let single = push1(pawns) & !occ;
+    let _single = push1(pawns) & !occ;
     // Double push
-    let double = push1(single & push1(start_rank & pawns) & !occ) & !occ;
+    let _double = push1(_single & push1(start_rank & pawns) & !occ) & !occ;
     // Actually simpler:
     let single2 = push1(pawns) & !occ;
     let double2 = push1(single2 & if us == 0 { 0x0000000000FF0000u64 } else { 0x0000FF0000000000u64 }) & !occ;
@@ -350,6 +355,7 @@ pub fn legal_moves(board: &Board) -> Vec<Move> {
 }
 
 /// Parse UCI move string (e.g. "e2e4", "e7e8q")
+#[allow(dead_code)]
 pub fn parse_uci_move(board: &Board, s: &str) -> Option<Move> {
     if s.len() < 4 { return None; }
     let b = s.as_bytes();
