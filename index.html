@@ -248,6 +248,9 @@
   }
   button:hover  { background: #c73652; }
   button:active { transform: scale(0.97); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button:disabled:hover { background: var(--accent); }
+  button.secondary:disabled:hover { background: var(--line); }
   button.secondary {
     background: var(--line);
     color: #c0c0e0;
@@ -477,7 +480,31 @@
       <button id="btn-sound" class="secondary" style="font-size:0.78rem;">🔊 Sound: On</button>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="mp-panel">
+      <div class="panel-title">Play a Friend</div>
+      <div id="mp-idle">
+        <button id="btn-mp-host" class="secondary" style="font-size:0.78rem;width:100%;">🔗 Create Invite Link</button>
+        <div style="font-size:0.7rem;color:#888;margin-top:6px;line-height:1.4;">Share generated link. Both must keep tab open.</div>
+      </div>
+      <div id="mp-hosting" style="display:none;">
+        <div style="font-size:0.72rem;color:#aaa;margin-bottom:6px;">Send this link to your friend:</div>
+        <input id="mp-link" readonly style="width:100%;padding:6px;font-size:0.7rem;background:#0a0a14;color:var(--text);border:1px solid var(--line);border-radius:4px;">
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <button id="btn-mp-copy" class="secondary" style="flex:1;font-size:0.72rem;padding:6px;">Copy Link</button>
+          <button id="btn-mp-cancel" class="secondary" style="flex:1;font-size:0.72rem;padding:6px;">Cancel</button>
+        </div>
+        <div id="mp-status" style="font-size:0.72rem;color:#f0a500;margin-top:6px;">Waiting for opponent…</div>
+      </div>
+      <div id="mp-connected" style="display:none;">
+        <div id="mp-conn-status" style="font-size:0.78rem;color:#4caf50;margin-bottom:6px;">● Connected to opponent</div>
+        <div id="mp-color-info" style="font-size:0.72rem;color:#aaa;margin-bottom:6px;"></div>
+        <button id="btn-mp-rematch" class="secondary" style="display:none;font-size:0.78rem;width:100%;padding:7px;margin-bottom:6px;">🔁 Rematch</button>
+        <div id="mp-rematch-status" style="display:none;font-size:0.7rem;color:#f0a500;margin-bottom:6px;"></div>
+        <button id="btn-mp-disconnect" class="secondary" style="font-size:0.72rem;width:100%;padding:6px;">Disconnect</button>
+      </div>
+    </div>
+
+    <div class="panel" id="engine-panel">
       <div class="panel-title">Engine Strength</div>
       <div class="slider-row">
         <input type="range" id="elo-slider" min="400" max="2400" step="100" value="1400">
@@ -516,6 +543,7 @@
   </div>
 </main>
 
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script type="module">
 import { Chess } from 'https://esm.sh/chess.js@1';
 
@@ -541,6 +569,9 @@ let resigned = null;         // 'w' | 'b' — color that resigned
 // Clock state
 let clock = { white: 0, black: 0, increment: 0, running: false, lastTick: 0, enabled: false };
 let clockIntervalId = null;
+
+// Multiplayer state
+let mp = null; // null when offline; { role: 'host'|'guest', peer, conn } when active
 
 const PIECE_URL = (color, type) =>
   `https://lichess1.org/assets/piece/cburnett/${color}${type.toUpperCase()}.svg`;
@@ -799,6 +830,7 @@ document.getElementById('btn-resign').onclick = () => {
   stopClock();
   playGameOverSound();
   renderBoard(); updateStatus();
+  if (mp) { mpSend({ type: 'resign' }); mpSaveSession(); mpUpdateRematchUI(); }
 };
 
 document.getElementById('btn-export-pgn').onclick = () => {
@@ -811,6 +843,490 @@ document.getElementById('btn-export-pgn').onclick = () => {
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
 };
+
+// ── Multiplayer (PeerJS) ───────────────────────────────────────────────────
+const ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun.cloudflare.com:3478' },
+  { urls: 'turn:openrelay.metered.ca:80',  username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+];
+const PEER_OPTS = { config: { iceServers: ICE_SERVERS } };
+const MP_SESSION_KEY = 'gambit_mp_session';
+const MP_GRACE_MS = 30000;
+const MP_SESSION_TTL_MS = 6 * 60 * 60 * 1000; // 6h
+
+let mpGraceTimer = null;
+let mpGuestRetryTimer = null;
+let mpRematchSent = false;
+let mpRematchInbound = false;
+
+function mpGenRoomId() {
+  // 8 char alphanumeric — collision-resistant for casual use
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function mpShowPanel(state) {
+  document.getElementById('mp-idle').style.display      = state === 'idle'      ? '' : 'none';
+  document.getElementById('mp-hosting').style.display   = state === 'hosting'   ? '' : 'none';
+  document.getElementById('mp-connected').style.display = state === 'connected' ? '' : 'none';
+}
+
+function mpUpdateUIForMode() {
+  const active = !!mp;
+  document.getElementById('engine-panel').style.display = active ? 'none' : '';
+  document.getElementById('btn-hint').disabled  = active;
+  document.getElementById('btn-undo').disabled  = active;
+  document.getElementById('btn-white').disabled  = active;
+  document.getElementById('btn-black').disabled  = active;
+  document.getElementById('btn-random').disabled = active;
+  document.getElementById('btn-new').disabled    = active;
+  document.getElementById('tc-select').disabled  = active && mp.role === 'guest';
+}
+
+function mpUpdateRematchUI() {
+  const btn = document.getElementById('btn-mp-rematch');
+  const stat = document.getElementById('mp-rematch-status');
+  const gameOver = chess.isGameOver() || resigned || (clock.enabled && (clock.white === 0 || clock.black === 0));
+  if (!mp || !gameOver) {
+    btn.style.display = 'none';
+    stat.style.display = 'none';
+    return;
+  }
+  btn.style.display = '';
+  if (mpRematchSent && mpRematchInbound) {
+    stat.style.display = 'none';
+  } else if (mpRematchSent) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Waiting for opponent…';
+    stat.style.display = 'none';
+  } else if (mpRematchInbound) {
+    btn.disabled = false;
+    btn.textContent = '✓ Accept Rematch';
+    stat.style.display = '';
+    stat.textContent = 'Opponent wants a rematch';
+  } else {
+    btn.disabled = false;
+    btn.textContent = '🔁 Rematch';
+    stat.style.display = 'none';
+  }
+}
+
+function mpSend(obj) {
+  if (mp && mp.conn && mp.conn.open) {
+    try { mp.conn.send(obj); } catch (e) { console.warn('send failed', e); }
+  }
+}
+
+function mpInviteLink(id) {
+  const base = window.location.origin + window.location.pathname;
+  return `${base}?peer=${id}`;
+}
+
+function mpSaveSession() {
+  if (!mp || !mp.roomId) return;
+  const s = {
+    role: mp.role,
+    roomId: mp.roomId,
+    playerColor,
+    fen: chess.fen(),
+    history: chess.history({ verbose: true }).map(m => ({ from: m.from, to: m.to, promotion: m.promotion })),
+    tc: document.getElementById('tc-select').value,
+    clock: { white: clock.white, black: clock.black, increment: clock.increment, enabled: clock.enabled },
+    resigned,
+    rematchSent: mpRematchSent,
+    rematchInbound: mpRematchInbound,
+    ts: Date.now(),
+  };
+  try { localStorage.setItem(MP_SESSION_KEY, JSON.stringify(s)); } catch {}
+}
+
+function mpLoadSession() {
+  try {
+    const raw = localStorage.getItem(MP_SESSION_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s || !s.roomId || !s.role) return null;
+    if (Date.now() - (s.ts || 0) > MP_SESSION_TTL_MS) { mpClearSession(); return null; }
+    return s;
+  } catch { return null; }
+}
+
+function mpClearSession() {
+  try { localStorage.removeItem(MP_SESSION_KEY); } catch {}
+}
+
+function mpRestoreGameState(s) {
+  chess = new Chess();
+  for (const mv of (s.history || [])) {
+    try { chess.move(mv); } catch {}
+  }
+  playerColor = s.playerColor;
+  flipped = playerColor === 'b';
+  document.getElementById('tc-select').value = s.tc || '300+0';
+  if (s.clock && s.clock.enabled) {
+    clock = { white: s.clock.white, black: s.clock.black, increment: s.clock.increment, enabled: true, running: false, lastTick: 0 };
+    document.getElementById('clock-top').classList.remove('hidden');
+    document.getElementById('clock-bottom').classList.remove('hidden');
+  } else {
+    clock.enabled = false;
+    document.getElementById('clock-top').classList.add('hidden');
+    document.getElementById('clock-bottom').classList.add('hidden');
+  }
+  resigned = s.resigned || null;
+  mpRematchSent = !!s.rematchSent;
+  mpRematchInbound = !!s.rematchInbound;
+  const h = chess.history({ verbose: true });
+  lastMove = h.length ? { from: h[h.length - 1].from, to: h[h.length - 1].to } : null;
+  selected = null; legalDests = []; premove = null; hintArrow = null; thinking = false;
+}
+
+function mpStartHost(opts = {}) {
+  if (mp && !opts.resume) return;
+  if (typeof Peer === 'undefined') { alert('PeerJS failed to load. Check your network.'); return; }
+
+  const roomId = (opts.resume && opts.resume.roomId) || mpGenRoomId();
+
+  if (!opts.resume) {
+    mpShowPanel('hosting');
+    document.getElementById('mp-link').value = mpInviteLink(roomId);
+    document.getElementById('mp-status').textContent = 'Waiting for opponent…';
+  }
+
+  const peer = new Peer(roomId, PEER_OPTS);
+  mp = { role: 'host', peer, conn: null, roomId, established: !!opts.resume, retryCount: opts.retryCount || 0 };
+
+  peer.on('open', (id) => {
+    if (!opts.resume) document.getElementById('mp-link').value = mpInviteLink(id);
+  });
+  peer.on('connection', (conn) => {
+    if (mp.conn && mp.conn.open) { conn.close(); return; }
+    mp.conn = conn;
+    conn.on('open', () => {
+      if (mp.established) {
+        // Reconnect — send full state sync
+        conn.send({
+          type: 'state_sync',
+          hostColor: playerColor,
+          fen: chess.fen(),
+          history: chess.history({ verbose: true }).map(m => ({ from: m.from, to: m.to, promotion: m.promotion })),
+          tc: document.getElementById('tc-select').value,
+          clock: { white: clock.white, black: clock.black, increment: clock.increment, enabled: clock.enabled },
+          resigned,
+        });
+        mpOnReconnected();
+      } else {
+        conn.send({ type: 'init', hostColor: playerColor, tc: document.getElementById('tc-select').value });
+        mpOnConnected();
+        startGame();
+        mp.established = true;
+        mpSaveSession();
+      }
+    });
+    conn.on('data', mpOnMessage);
+    conn.on('close', mpOnConnLost);
+    conn.on('error', (e) => console.warn('conn error', e));
+  });
+  peer.on('error', (err) => {
+    if (err.type === 'unavailable-id' && (mp.retryCount || 0) < 3) {
+      // Broker hasn't freed our ID yet — retry shortly
+      const next = (mp.retryCount || 0) + 1;
+      try { peer.destroy(); } catch {}
+      mp = null;
+      setTimeout(() => mpStartHost({ ...opts, retryCount: next }), 2000);
+      return;
+    }
+    console.error('peer error', err);
+    if (!opts.resume) alert('Connection error: ' + (err.type || err.message || 'unknown'));
+    mpReset();
+  });
+}
+
+function mpJoin(hostId, opts = {}) {
+  if (mp && !opts.resume) return;
+  if (typeof Peer === 'undefined') { alert('PeerJS failed to load. Check your network.'); return; }
+
+  if (!opts.resume) {
+    mpShowPanel('hosting');
+    document.getElementById('mp-link').value = 'Connecting…';
+    document.getElementById('mp-status').textContent = 'Connecting to host…';
+  }
+
+  const peer = new Peer(null, PEER_OPTS);
+  mp = { role: 'guest', peer, conn: null, roomId: hostId, established: !!opts.resume };
+
+  peer.on('open', () => mpGuestAttemptConnect(hostId, !!opts.resume));
+  peer.on('error', (err) => {
+    console.error('peer error', err);
+    if (!opts.resume) alert('Connection error: ' + (err.type || err.message || 'unknown'));
+    mpReset();
+  });
+}
+
+function mpGuestAttemptConnect(hostId, isResume) {
+  if (!mp || mp.role !== 'guest') return;
+  if (mp.peer.destroyed) return;
+  const conn = mp.peer.connect(hostId, { reliable: true });
+  mp.conn = conn;
+
+  let opened = false;
+  conn.on('open', () => {
+    opened = true;
+    if (isResume) {
+      // Notify host of our reconnect; host will send state_sync
+      conn.send({ type: 'resume_hello' });
+    }
+  });
+  conn.on('data', (data) => {
+    if (data && data.type === 'init') {
+      playerColor = data.hostColor === 'w' ? 'b' : 'w';
+      document.getElementById('tc-select').value = data.tc || document.getElementById('tc-select').value;
+      mpOnConnected();
+      startGame();
+      mp.established = true;
+      mpSaveSession();
+    } else if (data && data.type === 'state_sync') {
+      playerColor = data.hostColor === 'w' ? 'b' : 'w';
+      mpRestoreFromSync(data);
+      mpOnReconnected();
+      mp.established = true;
+      mpSaveSession();
+    } else {
+      mpOnMessage(data);
+    }
+  });
+  conn.on('close', mpOnConnLost);
+  conn.on('error', (e) => console.warn('conn error', e));
+
+  // Retry if connection doesn't open
+  setTimeout(() => {
+    if (!opened && mp && mp.role === 'guest' && !mp.peer.destroyed && (!mp.conn || !mp.conn.open)) {
+      try { conn.close(); } catch {}
+      mpGuestAttemptConnect(hostId, isResume);
+    }
+  }, 3000);
+}
+
+function mpRestoreFromSync(data) {
+  chess = new Chess();
+  for (const mv of (data.history || [])) {
+    try { chess.move(mv); } catch {}
+  }
+  flipped = playerColor === 'b';
+  document.getElementById('tc-select').value = data.tc || '300+0';
+  if (data.clock && data.clock.enabled) {
+    clock = { white: data.clock.white, black: data.clock.black, increment: data.clock.increment, enabled: true, running: false, lastTick: 0 };
+    document.getElementById('clock-top').classList.remove('hidden');
+    document.getElementById('clock-bottom').classList.remove('hidden');
+    if (!chess.isGameOver() && !data.resigned) startClock();
+  } else {
+    clock.enabled = false;
+  }
+  resigned = data.resigned || null;
+  const h = chess.history({ verbose: true });
+  lastMove = h.length ? { from: h[h.length - 1].from, to: h[h.length - 1].to } : null;
+  selected = null; legalDests = []; premove = null; hintArrow = null; thinking = false;
+  renderBoard(); renderHistory(); renderCaptured(); updateStatus(); updateOpeningName();
+  setEvalBar(0);
+}
+
+function mpOnConnected() {
+  mpShowPanel('connected');
+  document.getElementById('mp-conn-status').textContent = '● Connected to opponent';
+  document.getElementById('mp-conn-status').style.color = '#4caf50';
+  document.getElementById('mp-color-info').textContent = `You play ${playerColor === 'w' ? 'White' : 'Black'}`;
+  mpUpdateUIForMode();
+  mpUpdateRematchUI();
+  if (mpGraceTimer) { clearTimeout(mpGraceTimer); mpGraceTimer = null; }
+}
+
+function mpOnReconnected() {
+  mpShowPanel('connected');
+  document.getElementById('mp-conn-status').textContent = '● Reconnected';
+  document.getElementById('mp-conn-status').style.color = '#4caf50';
+  document.getElementById('mp-color-info').textContent = `You play ${playerColor === 'w' ? 'White' : 'Black'}`;
+  flashStatus('Reconnected');
+  mpUpdateUIForMode();
+  mpUpdateRematchUI();
+  if (mpGraceTimer) { clearTimeout(mpGraceTimer); mpGraceTimer = null; }
+}
+
+function mpOnMessage(msg) {
+  if (!msg || typeof msg !== 'object') return;
+  if (msg.type === 'move') {
+    if (chess.turn() === playerColor) return;
+    try {
+      const m = chess.move({ from: msg.from, to: msg.to, promotion: msg.promotion || 'q' });
+      if (!m) return;
+      lastMove = { from: msg.from, to: msg.to };
+      applyIncrementAfter(m.color);
+      if (chess.isCheckmate()) playGameOverSound();
+      else if (chess.inCheck()) playCheckSound();
+      else if (m.captured) playCaptureSound();
+      else playMoveSound();
+      renderBoard(); renderHistory(); renderCaptured();
+      updateStatus(); updateOpeningName();
+      mpSaveSession();
+      mpUpdateRematchUI();
+      tryPremove();
+    } catch (e) { console.warn('Bad remote move:', msg, e); }
+  } else if (msg.type === 'resign') {
+    resigned = playerColor === 'w' ? 'b' : 'w';
+    stopClock();
+    playGameOverSound();
+    renderBoard(); updateStatus();
+    mpSaveSession();
+    mpUpdateRematchUI();
+  } else if (msg.type === 'resume_hello') {
+    // Guest re-announced; host already sends state_sync on conn open in established mode
+    // (handled in connection handler). No-op here.
+  } else if (msg.type === 'rematch_request') {
+    mpRematchInbound = true;
+    if (mpRematchSent) {
+      mpStartRematchGame();
+      mpSend({ type: 'rematch_accept' });
+    } else {
+      mpUpdateRematchUI();
+    }
+  } else if (msg.type === 'rematch_accept') {
+    mpStartRematchGame();
+  } else if (msg.type === 'rematch_decline') {
+    mpRematchInbound = false;
+    flashStatus('Opponent declined rematch');
+    mpUpdateRematchUI();
+  }
+}
+
+function mpRequestRematch() {
+  if (!mp || !mp.conn || !mp.conn.open) return;
+  if (mpRematchSent) return;
+  mpRematchSent = true;
+  if (mpRematchInbound) {
+    mpStartRematchGame();
+    mpSend({ type: 'rematch_accept' });
+  } else {
+    mpSend({ type: 'rematch_request' });
+    mpUpdateRematchUI();
+  }
+}
+
+function mpStartRematchGame() {
+  mpRematchSent = false;
+  mpRematchInbound = false;
+  playerColor = playerColor === 'w' ? 'b' : 'w';
+  document.getElementById('mp-color-info').textContent = `You play ${playerColor === 'w' ? 'White' : 'Black'}`;
+  resigned = null;
+  startGame();
+  mpUpdateRematchUI();
+  mpSaveSession();
+}
+
+function mpOnConnLost() {
+  if (!mp) return;
+  // If game is already over, just clear cleanly
+  if (chess.isGameOver() || resigned) { mpReset(); return; }
+
+  // Mark UI as disconnected, start grace timer
+  document.getElementById('mp-conn-status').textContent = '⟳ Opponent disconnected — waiting 30s…';
+  document.getElementById('mp-conn-status').style.color = '#f0a500';
+  flashStatus('Opponent disconnected — reconnecting…');
+  mpSaveSession();
+
+  // Guest actively retries connecting; host waits passively for incoming connection
+  if (mp.role === 'guest' && mp.peer && !mp.peer.destroyed) {
+    mpGuestAttemptConnect(mp.roomId, true);
+  }
+
+  if (mpGraceTimer) clearTimeout(mpGraceTimer);
+  mpGraceTimer = setTimeout(() => {
+    if (!mp) return;
+    if (mp.conn && mp.conn.open) return; // reconnected
+    // Forfeit
+    if (!chess.isGameOver() && !resigned) {
+      resigned = playerColor === 'w' ? 'b' : 'w';
+      stopClock();
+      updateStatus();
+    }
+    mpReset();
+  }, MP_GRACE_MS);
+}
+
+function mpReset() {
+  try { if (mp && mp.conn) mp.conn.close(); } catch {}
+  try { if (mp && mp.peer) mp.peer.destroy(); } catch {}
+  if (mpGraceTimer) { clearTimeout(mpGraceTimer); mpGraceTimer = null; }
+  if (mpGuestRetryTimer) { clearTimeout(mpGuestRetryTimer); mpGuestRetryTimer = null; }
+  mp = null;
+  mpRematchSent = false;
+  mpRematchInbound = false;
+  mpClearSession();
+  mpShowPanel('idle');
+  mpUpdateUIForMode();
+  mpUpdateRematchUI();
+}
+
+document.getElementById('btn-mp-host').onclick = () => mpStartHost();
+document.getElementById('btn-mp-cancel').onclick = mpReset;
+document.getElementById('btn-mp-disconnect').onclick = () => {
+  if (confirm('Disconnect from opponent? This ends the game.')) mpReset();
+};
+document.getElementById('btn-mp-copy').onclick = async () => {
+  const link = document.getElementById('mp-link').value;
+  try { await navigator.clipboard.writeText(link); flashStatus('Link copied'); }
+  catch { document.getElementById('mp-link').select(); }
+};
+document.getElementById('btn-mp-rematch').onclick = mpRequestRematch;
+
+// Save session on tab close
+window.addEventListener('beforeunload', () => { if (mp) mpSaveSession(); });
+
+// Auto-resume from localStorage; else auto-join from ?peer=
+(function mpBootstrap() {
+  const params = new URLSearchParams(window.location.search);
+  const urlHostId = params.get('peer');
+  const saved = mpLoadSession();
+
+  setTimeout(() => {
+    if (saved && (!urlHostId || urlHostId === saved.roomId)) {
+      const ok = confirm('Resume previous multiplayer game?');
+      if (ok) {
+        document.getElementById('loading').style.display = 'none';
+        mpRestoreGameState(saved);
+        renderBoard(); renderHistory(); renderCaptured(); updateStatus(); updateOpeningName();
+        mpShowPanel('connected');
+        document.getElementById('mp-conn-status').textContent = '⟳ Reconnecting…';
+        document.getElementById('mp-conn-status').style.color = '#f0a500';
+        document.getElementById('mp-color-info').textContent = `You play ${playerColor === 'w' ? 'White' : 'Black'}`;
+        if (saved.role === 'host') mpStartHost({ resume: saved });
+        else                       mpJoin(saved.roomId, { resume: saved });
+        // For resume, start grace timer immediately so we forfeit if no reconnect within window
+        if (mpGraceTimer) clearTimeout(mpGraceTimer);
+        mpGraceTimer = setTimeout(() => {
+          if (!mp || !mp.conn || !mp.conn.open) {
+            if (!chess.isGameOver() && !resigned) {
+              resigned = playerColor === 'w' ? 'b' : 'w';
+              stopClock();
+              updateStatus();
+            }
+            mpReset();
+            flashStatus('Reconnect failed — game ended');
+          }
+        }, MP_GRACE_MS);
+        if (urlHostId) history.replaceState({}, '', window.location.pathname);
+        mpUpdateUIForMode();
+        mpUpdateRematchUI();
+        return;
+      } else {
+        mpClearSession();
+      }
+    }
+    if (urlHostId) {
+      if (confirm('Join chess game as opponent?')) mpJoin(urlHostId);
+      history.replaceState({}, '', window.location.pathname);
+    }
+  }, 250);
+})();
 
 // ── Elo slider ─────────────────────────────────────────────────────────────
 function setEloLabel() {
@@ -878,6 +1394,7 @@ function tickClock() {
   if (clock.white === 0 || clock.black === 0) {
     stopClock();
     updateStatus(); // shows flag loss
+    if (mp) { mpSaveSession(); mpUpdateRematchUI(); }
   }
   renderClocks();
 }
@@ -1115,6 +1632,7 @@ async function tryPremove() {
       else if (m.captured) playCaptureSound();
       else playMoveSound();
       renderBoard(); renderHistory(); renderCaptured(); updateStatus(); updateOpeningName();
+      if (mp) mpSend({ type: 'move', from, to, promotion: promotion || 'q' });
       return true;
     }
   } catch {}
@@ -1123,6 +1641,7 @@ async function tryPremove() {
 
 // ── Engine move ────────────────────────────────────────────────────────────
 async function triggerEngineMove() {
+  if (mp) return; // No engine in multiplayer
   if (chess.isGameOver() || resigned) return;
   thinking = true;
   updateStatus();
@@ -1235,6 +1754,13 @@ async function doMove(from, to) {
   updateStatus();
   updateOpeningName();
 
+  if (mp) {
+    mpSend({ type: 'move', from, to, promotion });
+    mpSaveSession();
+    mpUpdateRematchUI();
+    return;
+  }
+
   if (chess.isGameOver()) { refreshEval(); return; }
   await triggerEngineMove();
 }
@@ -1322,7 +1848,8 @@ function updateStatus() {
     el.textContent = (chess.turn() === 'w' ? 'White' : 'Black') + ' is in check!';
     return;
   }
-  el.textContent = chess.turn() === playerColor ? 'Your turn' : 'Engine to move…';
+  if (chess.turn() === playerColor) el.textContent = 'Your turn';
+  else el.textContent = mp ? 'Opponent to move…' : 'Engine to move…';
 }
 
 function flashStatus(msg) {
@@ -1363,6 +1890,7 @@ function renderHistory() {
 
 // ── Eval bar ────────────────────────────────────────────────────────────────
 async function refreshEval() {
+  if (mp) { setEvalBar(0); return; } // No engine assist in multiplayer
   const fill = document.getElementById('eval-fill');
   const lab = document.getElementById('eval-label');
   if (chess.isGameOver()) {
