@@ -1,6 +1,6 @@
 use crate::types::*;
 use crate::board::Board;
-use crate::movegen::{bishop_attacks, rook_attacks, knight_attacks};
+use crate::movegen::{bishop_attacks, rook_attacks, knight_attacks, king_attacks, pawn_attackers_mask};
 
 const FILE_A: u64 = 0x0101010101010101;
 
@@ -191,6 +191,10 @@ fn game_phase(board: &Board) -> i32 {
 
 /// Static evaluation, positive = good for side to move
 pub fn evaluate(board: &Board) -> i32 {
+    // 50-move and insufficient-material draws return 0 immediately.
+    if board.halfmove >= 100 { return 0; }
+    if insufficient_material(board) { return 0; }
+
     let phase = game_phase(board);
     let mut mg = 0i32;
     let mut eg = 0i32;
@@ -410,4 +414,108 @@ pub fn mvv_lva(board: &Board, mv: Move) -> i32 {
         return PIECE_VALUE[victim as usize] * 10 - PIECE_VALUE[attacker as usize];
     }
     0
+}
+
+// ── Insufficient material draw detection ──────────────────────────────────────
+
+/// True if neither side can possibly force checkmate.
+pub fn insufficient_material(board: &Board) -> bool {
+    let pawns  = board.pieces[0][Piece::Pawn as usize]   | board.pieces[1][Piece::Pawn as usize];
+    let rooks  = board.pieces[0][Piece::Rook as usize]   | board.pieces[1][Piece::Rook as usize];
+    let queens = board.pieces[0][Piece::Queen as usize]  | board.pieces[1][Piece::Queen as usize];
+    if pawns | rooks | queens != 0 { return false; }
+
+    let knights = board.pieces[0][Piece::Knight as usize] | board.pieces[1][Piece::Knight as usize];
+    let bishops = board.pieces[0][Piece::Bishop as usize] | board.pieces[1][Piece::Bishop as usize];
+    let minors  = (knights | bishops).count_ones();
+
+    if minors == 0 { return true; }                  // K vs K
+    if minors == 1 { return true; }                  // K + minor vs K
+    if minors == 2 && knights == 0 {
+        // K+B vs K+B: drawn if both bishops on same color complex.
+        const LIGHT: u64 = 0x55AA55AA55AA55AA;
+        let on_light = bishops & LIGHT == bishops;
+        let on_dark  = bishops & !LIGHT == bishops;
+        if on_light || on_dark { return true; }
+    }
+    false
+}
+
+// ── Static Exchange Evaluation ────────────────────────────────────────────────
+
+/// Returns the material gain of playing `mv` and resolving all recaptures.
+/// Used to order/prune captures.  Roughly correct: ignores pins.
+pub fn see(board: &Board, mv: Move) -> i32 {
+    let to = mv.to();
+    let from = mv.from();
+
+    let (_, attacker_piece) = match board.piece_on(from) {
+        Some(p) => p,
+        None => return 0,
+    };
+
+    // Capture victim (could be the EP'd pawn, but we approximate as the piece on `to`).
+    let initial_victim = board.piece_on(to).map(|(_, p)| PIECE_VALUE[p as usize]).unwrap_or(0);
+
+    let mut occ = board.all & !(1u64 << from);
+    let mut side = board.side.flip();
+    let mut piece_val = PIECE_VALUE[attacker_piece as usize];
+
+    let mut gains = [0i32; 32];
+    gains[0] = initial_victim;
+    let mut d = 0usize;
+
+    loop {
+        d += 1;
+        if d >= 32 { break; }
+        gains[d] = piece_val - gains[d - 1];
+        // Stand pat: if our current best is already worse than the opp's best stand-pat,
+        // no need to continue (caller folds it back below).
+        if gains[d].max(-gains[d - 1]) < 0 { break; }
+
+        match least_valuable_attacker(board, to, side, occ) {
+            None => break,
+            Some((sq, p)) => {
+                occ &= !(1u64 << sq);
+                piece_val = PIECE_VALUE[p as usize];
+                side = side.flip();
+            }
+        }
+    }
+
+    while d > 0 {
+        gains[d - 1] = -gains[d - 1].max(-gains[d]);
+        d -= 1;
+    }
+    gains[0]
+}
+
+fn least_valuable_attacker(board: &Board, to: usize, side: Color, occ: u64) -> Option<(usize, Piece)> {
+    let c = side as usize;
+
+    // Pawn
+    let pawns = pawn_attackers_mask(c, to) & board.pieces[c][Piece::Pawn as usize] & occ;
+    if pawns != 0 { return Some((pawns.trailing_zeros() as usize, Piece::Pawn)); }
+
+    // Knight
+    let kn = knight_attacks(to) & board.pieces[c][Piece::Knight as usize] & occ;
+    if kn != 0 { return Some((kn.trailing_zeros() as usize, Piece::Knight)); }
+
+    // Bishop / Queen diagonals (compute once)
+    let battack = bishop_attacks(to, occ);
+    let bs = battack & board.pieces[c][Piece::Bishop as usize] & occ;
+    if bs != 0 { return Some((bs.trailing_zeros() as usize, Piece::Bishop)); }
+
+    // Rook / Queen orthogonals
+    let rattack = rook_attacks(to, occ);
+    let rs = rattack & board.pieces[c][Piece::Rook as usize] & occ;
+    if rs != 0 { return Some((rs.trailing_zeros() as usize, Piece::Rook)); }
+
+    let qs = (battack | rattack) & board.pieces[c][Piece::Queen as usize] & occ;
+    if qs != 0 { return Some((qs.trailing_zeros() as usize, Piece::Queen)); }
+
+    let ks = king_attacks(to) & board.pieces[c][Piece::King as usize] & occ;
+    if ks != 0 { return Some((ks.trailing_zeros() as usize, Piece::King)); }
+
+    None
 }

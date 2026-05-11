@@ -204,6 +204,17 @@
       <div id="puzzle-date"></div>
       <div id="puzzle-turn"></div>
       <div id="puzzle-progress"></div>
+      <div id="puzzle-timer" style="margin-top:6px;font-family:'SF Mono',Menlo,monospace;font-size:0.85rem;color:#aaa;">0:00</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Stats</div>
+      <div id="stat-row" style="display:flex;gap:14px;font-size:0.85rem;">
+        <div><span style="color:#666;display:block;font-size:0.7rem;">STREAK</span><span id="stat-streak" style="font-weight:700;color:#f0a500;">0</span></div>
+        <div><span style="color:#666;display:block;font-size:0.7rem;">SOLVED</span><span id="stat-solved" style="font-weight:700;color:#4caf50;">0</span></div>
+        <div><span style="color:#666;display:block;font-size:0.7rem;">FAILED</span><span id="stat-failed" style="font-weight:700;color:#e05555;">0</span></div>
+        <div><span style="color:#666;display:block;font-size:0.7rem;">BEST</span><span id="stat-best" style="font-weight:700;">—</span></div>
+      </div>
     </div>
 
     <div class="panel">
@@ -243,6 +254,54 @@ let lastMove    = null;
 let flipped     = false;
 let puzzleOffset = 0;
 let enginePlaying = false; // debounce during engine auto-reply
+let dragState = null;
+let failed = false;     // current puzzle counted as failure
+let startTime = 0;      // ms timestamp puzzle started
+let timerInterval = null;
+
+// ── Stats (localStorage) ─────────────────────────────────────────────────────
+function loadStats() {
+  try { return JSON.parse(localStorage.getItem('gambit_puzzle_stats') || '{}'); }
+  catch { return {}; }
+}
+function saveStats(s) { localStorage.setItem('gambit_puzzle_stats', JSON.stringify(s)); }
+function renderStats() {
+  const s = loadStats();
+  document.getElementById('stat-streak').textContent = s.streak || 0;
+  document.getElementById('stat-solved').textContent = s.solved || 0;
+  document.getElementById('stat-failed').textContent = s.failed || 0;
+  document.getElementById('stat-best').textContent   = s.bestStreak || s.streak || 0;
+}
+function recordSolve(timeSec) {
+  const s = loadStats();
+  s.solved = (s.solved || 0) + 1;
+  s.streak = (s.streak || 0) + 1;
+  s.bestStreak = Math.max(s.bestStreak || 0, s.streak);
+  s.lastSolveDate = new Date().toISOString().slice(0, 10);
+  if (!s.fastest || timeSec < s.fastest) s.fastest = timeSec;
+  saveStats(s); renderStats();
+}
+function recordFail() {
+  const s = loadStats();
+  s.failed = (s.failed || 0) + 1;
+  s.streak = 0;
+  saveStats(s); renderStats();
+}
+renderStats();
+
+function startTimer() {
+  startTime = performance.now();
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(updateTimer, 200);
+  updateTimer();
+}
+function stopTimer() { if (timerInterval) { clearInterval(timerInterval); timerInterval = null; } }
+function updateTimer() {
+  const sec = Math.floor((performance.now() - startTime) / 1000);
+  const m = Math.floor(sec / 60), r = sec % 60;
+  document.getElementById('puzzle-timer').textContent = m + ':' + String(r).padStart(2, '0');
+}
+function elapsedSec() { return Math.floor((performance.now() - startTime) / 1000); }
 
 // ── Date seed ─────────────────────────────────────────────────────────────────
 function dateSeed() {
@@ -303,6 +362,9 @@ function onPuzzleReady(p) {
 
   chess = new Chess();
   chess.load(p.fen);
+
+  failed = false;
+  startTimer();
 
   setGenerating(false);
   renderPuzzleInfo();
@@ -377,7 +439,9 @@ function renderBoard() {
       }
 
       const interactive = !solved && !revealed && !enginePlaying && chess.turn() === puzzle?.turn;
-      if (interactive) div.onclick = () => onSquareClick(sq);
+      if (interactive) {
+        div.addEventListener('pointerdown', (ev) => onPointerDown(ev, sq));
+      }
       boardEl.appendChild(div);
     }
   }
@@ -398,10 +462,12 @@ function renderEmptyBoard() {
   }
 }
 
-// ── Click & move logic ────────────────────────────────────────────────────────
-function onSquareClick(sq) {
+// ── Pointer (click + drag) ──────────────────────────────────────────────────
+function onPointerDown(ev, sq) {
   if (!chess || !puzzle || solved || revealed || enginePlaying) return;
   if (chess.turn() !== puzzle.turn) return;
+  if (ev.button !== undefined && ev.button !== 0) return;
+  ev.preventDefault();
 
   const piece = chess.get(sq);
 
@@ -413,11 +479,44 @@ function onSquareClick(sq) {
     selected   = sq;
     legalDests = chess.moves({ square: sq, verbose: true }).map(m => m.to);
     renderBoard();
+    startDrag(ev, sq, piece);
     return;
   }
   selected   = null;
   legalDests = [];
   renderBoard();
+}
+
+function startDrag(ev, sq, piece) {
+  const ghost = document.createElement('div');
+  ghost.style.cssText = 'position:fixed;width:70px;height:70px;pointer-events:none;z-index:1000;transform:translate(-50%,-50%);';
+  const img = document.createElement('img');
+  img.src = PIECE_URL(piece.color, piece.type);
+  img.style.cssText = 'width:100%;height:100%;filter:drop-shadow(0 4px 6px rgba(0,0,0,0.5));';
+  ghost.appendChild(img);
+  document.body.appendChild(ghost);
+  ghost.style.left = ev.clientX + 'px';
+  ghost.style.top  = ev.clientY + 'px';
+  dragState = { from: sq };
+
+  const onMove = (e) => {
+    ghost.style.left = e.clientX + 'px';
+    ghost.style.top  = e.clientY + 'px';
+  };
+  const onUp = (e) => {
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    ghost.remove();
+    const target = document.elementFromPoint(e.clientX, e.clientY);
+    const targetSq = target && target.closest('.sq') ? target.closest('.sq').dataset.sq : null;
+    const fromSq = dragState.from;
+    dragState = null;
+    if (targetSq && targetSq !== fromSq && legalDests.includes(targetSq)) {
+      attemptPlayerMove(fromSq, targetSq);
+    }
+  };
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
 }
 
 function attemptPlayerMove(from, to) {
@@ -454,11 +553,12 @@ function attemptPlayerMove(from, to) {
       setTimeout(() => playEngineMove(), 700);
     }
   } else {
-    // Wrong — undo
+    // Wrong — undo, count failure once per puzzle
     chess.undo();
     lastMove   = null;
     renderBoard();
     shakeBoard();
+    if (!failed) { failed = true; recordFail(); }
     updateStatus('Not the best move. Try again.', 'wrong');
     setTimeout(() => updateStatus('Find the best move.', 'info'), 1500);
   }
@@ -486,6 +586,8 @@ function playEngineMove() {
 
 function finishPuzzle(from, to) {
   solved = true;
+  stopTimer();
+  if (!failed) recordSolve(elapsedSec());
   selected = null;
   legalDests = [];
   renderBoard();
@@ -524,6 +626,8 @@ document.getElementById('btn-solution').onclick = () => {
   enginePlaying = false;
   selected  = null;
   legalDests = [];
+  stopTimer();
+  if (!failed && !solved) { failed = true; recordFail(); }
   document.getElementById('btn-hint').disabled     = true;
   document.getElementById('btn-solution').disabled = true;
 

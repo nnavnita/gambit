@@ -12,7 +12,29 @@ export class Engine {
         wasm.__wbg_engine_free(ptr, 0);
     }
     /**
-     * Best move for given FEN at given depth. Returns UCI string e.g. "e2e4".
+     * Top-N candidate moves. Returns "uci:cp" entries joined by "," —
+     * cp is from White's perspective. Sorted best-for-side-to-move first.
+     * @param {string} fen
+     * @param {number} depth
+     * @param {number} n
+     * @returns {string}
+     */
+    analyse_multi(fen, depth, n) {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ptr0 = passStringToWasm0(fen, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.engine_analyse_multi(this.__wbg_ptr, ptr0, len0, depth, n);
+            deferred2_0 = ret[0];
+            deferred2_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+    /**
+     * Best move at fixed depth.
      * @param {string} fen
      * @param {number} depth
      * @returns {string}
@@ -32,7 +54,30 @@ export class Engine {
         }
     }
     /**
-     * Evaluate position in centipawns from white's perspective.
+     * Best move with a time budget in milliseconds (iterative deepening).
+     * @param {string} fen
+     * @param {number} ms
+     * @returns {string}
+     */
+    best_move_time(fen, ms) {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ptr0 = passStringToWasm0(fen, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.engine_best_move_time(this.__wbg_ptr, ptr0, len0, ms);
+            deferred2_0 = ret[0];
+            deferred2_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+    clear_info_callback() {
+        wasm.engine_clear_info_callback(this.__wbg_ptr);
+    }
+    /**
+     * Position eval in centipawns from White's perspective.
      * @param {string} fen
      * @param {number} depth
      * @returns {number}
@@ -68,6 +113,23 @@ export class Engine {
         EngineFinalization.register(this, this.__wbg_ptr, this);
         return this;
     }
+    /**
+     * Provide the game's prior positions as a "|"-delimited FEN list.
+     * Drives threefold-repetition detection in search.
+     * @param {string} fens_pipe
+     */
+    set_history(fens_pipe) {
+        const ptr0 = passStringToWasm0(fens_pipe, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.engine_set_history(this.__wbg_ptr, ptr0, len0);
+    }
+    /**
+     * Register a JS callback: `fn(depth, score_cp, pv_uci, nodes, elapsed_ms)`.
+     * @param {Function} cb
+     */
+    set_info_callback(cb) {
+        wasm.engine_set_info_callback(this.__wbg_ptr, cb);
+    }
 }
 if (Symbol.dispose) Engine.prototype[Symbol.dispose] = Engine.prototype.free;
 function __wbg_get_imports() {
@@ -76,6 +138,10 @@ function __wbg_get_imports() {
         __wbg___wbindgen_throw_6b64449b9b9ed33c: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
         },
+        __wbg_call_a24592a6f349a97e: function() { return handleError(function (arg0, arg1, arg2) {
+            const ret = arg0.call(arg1, arg2);
+            return ret;
+        }, arguments); },
         __wbg_error_a6fa202b58aa1cd3: function(arg0, arg1) {
             let deferred0_0;
             let deferred0_1;
@@ -91,12 +157,34 @@ function __wbg_get_imports() {
             const ret = new Error();
             return ret;
         },
+        __wbg_new_682678e2f47e32bc: function() {
+            const ret = new Array();
+            return ret;
+        },
+        __wbg_now_a9b7df1cbee90986: function() {
+            const ret = Date.now();
+            return ret;
+        },
+        __wbg_push_471a5b068a5295f6: function(arg0, arg1) {
+            const ret = arg0.push(arg1);
+            return ret;
+        },
         __wbg_stack_3b0d974bbf31e44f: function(arg0, arg1) {
             const ret = arg1.stack;
             const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
             const len1 = WASM_VECTOR_LEN;
             getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
             getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
+        },
+        __wbindgen_cast_0000000000000001: function(arg0) {
+            // Cast intrinsic for `F64 -> Externref`.
+            const ret = arg0;
+            return ret;
+        },
+        __wbindgen_cast_0000000000000002: function(arg0, arg1) {
+            // Cast intrinsic for `Ref(String) -> Externref`.
+            const ret = getStringFromWasm0(arg0, arg1);
+            return ret;
         },
         __wbindgen_init_externref_table: function() {
             const table = wasm.__wbindgen_externrefs;
@@ -118,6 +206,12 @@ const EngineFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_engine_free(ptr >>> 0, 1));
 
+function addToExternrefTable0(obj) {
+    const idx = wasm.__externref_table_alloc();
+    wasm.__wbindgen_externrefs.set(idx, obj);
+    return idx;
+}
+
 let cachedDataViewMemory0 = null;
 function getDataViewMemory0() {
     if (cachedDataViewMemory0 === null || cachedDataViewMemory0.buffer.detached === true || (cachedDataViewMemory0.buffer.detached === undefined && cachedDataViewMemory0.buffer !== wasm.memory.buffer)) {
@@ -137,6 +231,15 @@ function getUint8ArrayMemory0() {
         cachedUint8ArrayMemory0 = new Uint8Array(wasm.memory.buffer);
     }
     return cachedUint8ArrayMemory0;
+}
+
+function handleError(f, args) {
+    try {
+        return f.apply(this, args);
+    } catch (e) {
+        const idx = addToExternrefTable0(e);
+        wasm.__wbindgen_exn_store(idx);
+    }
 }
 
 function passStringToWasm0(arg, malloc, realloc) {

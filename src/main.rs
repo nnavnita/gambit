@@ -4,6 +4,7 @@ mod movegen;
 mod eval;
 mod tt;
 mod search;
+mod book;
 #[cfg(not(target_arch = "wasm32"))]
 mod uci;
 

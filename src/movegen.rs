@@ -80,6 +80,17 @@ pub fn knight_attacks(sq: usize) -> Bitboard {
     KNIGHT_ATTACKS.get().unwrap()[sq]
 }
 
+pub fn king_attacks(sq: usize) -> Bitboard {
+    KING_ATTACKS.get().unwrap()[sq]
+}
+
+/// Squares from which a pawn of color `side` would capture INTO `sq`.
+pub fn pawn_attackers_mask(side: usize, sq: usize) -> Bitboard {
+    // Inverse of PAWN_ATTACKS[side]: squares that attack `sq` are
+    // exactly squares attacked by the opposite color's pawn from `sq`.
+    PAWN_ATTACKS.get().unwrap()[1 - side][sq]
+}
+
 pub fn rook_attacks(sq: usize, occ: Bitboard) -> Bitboard {
     sliding_attacks(sq, occ, &[8, -8, 1, -1])
 }
