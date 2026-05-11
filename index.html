@@ -467,6 +467,7 @@
         <button id="btn-undo" class="secondary" style="flex:1;font-size:0.78rem;padding:7px 4px;">↶ Undo</button>
         <button id="btn-hint" class="secondary" style="flex:1;font-size:0.78rem;padding:7px 4px;">💡 Hint</button>
       </div>
+      <button id="btn-resign" class="secondary" style="font-size:0.78rem;">🏳 Resign</button>
       <button id="btn-flip" class="secondary">Flip Board</button>
       <div style="display:flex;gap:6px;">
         <button id="btn-copy-fen"   class="secondary" style="flex:1;font-size:0.72rem;padding:7px 2px;">Copy FEN</button>
@@ -535,6 +536,7 @@ let theme = localStorage.getItem('gambit_theme') || 'default';
 let hintArrow = null;        // {from, to}
 let premove = null;          // {from, to, promotion}
 let dragState = null;        // {from, ghostEl, piece}
+let resigned = null;         // 'w' | 'b' — color that resigned
 
 // Clock state
 let clock = { white: 0, black: 0, increment: 0, running: false, lastTick: 0, enabled: false };
@@ -692,6 +694,7 @@ function startGame() {
   premove = null;
   hintArrow = null;
   thinking = false;
+  resigned = null;
   flipped = playerColor === 'b';
   initClock();
   renderBoard();
@@ -732,6 +735,7 @@ document.getElementById('btn-sound').onclick = () => {
 // ── Undo / Hint / FEN / PGN ────────────────────────────────────────────────
 document.getElementById('btn-undo').onclick = () => {
   if (thinking || pendingMoveResolve) return;
+  if (resigned) { resigned = null; startClock(); renderBoard(); updateStatus(); refreshEval(); return; }
   let undone = chess.undo();
   if (!undone) return;
   if (chess.turn() !== playerColor) chess.undo();
@@ -743,7 +747,7 @@ document.getElementById('btn-undo').onclick = () => {
 };
 
 document.getElementById('btn-hint').onclick = async () => {
-  if (thinking || chess.isGameOver() || chess.turn() !== playerColor) return;
+  if (thinking || chess.isGameOver() || resigned || chess.turn() !== playerColor) return;
   const mv = await engineHint(chess.fen(), 5);
   if (mv && mv.length >= 4) {
     hintArrow = { from: mv.slice(0, 2), to: mv.slice(2, 4) };
@@ -764,11 +768,22 @@ document.getElementById('btn-load-fen').onclick = () => {
   const test = new Chess();
   try { test.load(input.trim()); } catch { alert('Invalid FEN'); return; }
   chess = test;
-  selected = null; legalDests = []; lastMove = null; premove = null; hintArrow = null; thinking = false;
+  selected = null; legalDests = []; lastMove = null; premove = null; hintArrow = null; thinking = false; resigned = null;
   playerColor = chess.turn();
   flipped = playerColor === 'b';
   renderBoard(); renderHistory(); renderCaptured(); updateStatus(); updateColorButtons(); updateOpeningName();
   refreshEval();
+};
+
+document.getElementById('btn-resign').onclick = () => {
+  if (resigned || chess.isGameOver()) return;
+  if (!confirm('Resign the game?')) return;
+  resigned = playerColor;
+  thinking = false;
+  selected = null; legalDests = []; premove = null; hintArrow = null;
+  stopClock();
+  playGameOverSound();
+  renderBoard(); updateStatus();
 };
 
 document.getElementById('btn-export-pgn').onclick = () => {
@@ -983,6 +998,7 @@ function drawArrow(svg, from, to, color) {
 // ── Pointer (click + drag) ─────────────────────────────────────────────────
 function onPointerDown(ev, sq) {
   if (ev.button !== undefined && ev.button !== 0) return;
+  if (resigned) return;
   ev.preventDefault();
 
   const piece = chess.get(sq);
@@ -1092,7 +1108,7 @@ async function tryPremove() {
 
 // ── Engine move ────────────────────────────────────────────────────────────
 async function triggerEngineMove() {
-  if (chess.isGameOver()) return;
+  if (chess.isGameOver() || resigned) return;
   thinking = true;
   updateStatus();
   renderBoard();
@@ -1244,6 +1260,13 @@ function updateStatus() {
   const el = document.getElementById('status-text');
   el.className = '';
 
+  if (resigned) {
+    const loser = resigned === 'w' ? 'White' : 'Black';
+    const winner = resigned === 'w' ? 'Black' : 'White';
+    el.className = resigned === playerColor ? 'lose' : 'win';
+    el.textContent = loser + ' resigned — ' + winner + ' wins';
+    return;
+  }
   if (clock.enabled && (clock.white === 0 || clock.black === 0)) {
     const flagged = clock.white === 0 ? 'White' : 'Black';
     const winnerPlayer = (flagged === 'White') !== (playerColor === 'w');

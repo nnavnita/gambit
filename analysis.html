@@ -241,10 +241,17 @@
     text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.6);
     z-index: 2;
   }
-  .sq.sq-ann-blunder::after    { color: #ff4444; }
-  .sq.sq-ann-mistake::after    { color: #ffaa00; }
-  .sq.sq-ann-inaccuracy::after { color: #aaaaff; }
+  .sq.sq-ann-brilliant::after  { color: #26c6da; }
+  .sq.sq-ann-great::after      { color: #5bc0eb; }
   .sq.sq-ann-best::after       { color: #44dd44; }
+  .sq.sq-ann-excellent::after  { color: #8bc34a; }
+  .sq.sq-ann-good::after       { color: #aed581; }
+  .sq.sq-ann-book::after       { color: #b78b56; }
+  .sq.sq-ann-forced::after     { color: #9aa0a6; }
+  .sq.sq-ann-inaccuracy::after { color: #f8c350; }
+  .sq.sq-ann-mistake::after    { color: #ffaa00; }
+  .sq.sq-ann-miss::after       { color: #ee7752; }
+  .sq.sq-ann-blunder::after    { color: #ff4444; }
   .sq img { width: 82%; height: 82%; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
 
   /* ── Move list panel ── */
@@ -306,14 +313,24 @@
     font-weight: 700;
     flex-shrink: 0;
   }
-  .ann-blunder   { color: #e05555; }
-  .ann-mistake   { color: #f0a500; }
-  .ann-inaccuracy{ color: #8888ff; }
+  .ann-brilliant { color: #26c6da; }
+  .ann-great     { color: #5bc0eb; }
   .ann-best      { color: #4caf50; }
+  .ann-excellent { color: #8bc34a; }
+  .ann-good      { color: #aed581; }
+  .ann-book      { color: #b78b56; }
+  .ann-forced    { color: #9aa0a6; }
+  .ann-inaccuracy{ color: #f8c350; }
+  .ann-mistake   { color: #f0a500; }
+  .ann-miss      { color: #ee7752; }
+  .ann-blunder   { color: #e05555; }
 
-  .move-cell.bg-blunder    { background: rgba(224,85,85,0.18); border-left: 3px solid #e05555; }
-  .move-cell.bg-mistake    { background: rgba(240,165,0,0.15); border-left: 3px solid #f0a500; }
-  .move-cell.bg-inaccuracy { background: rgba(136,136,255,0.12); border-left: 3px solid #8888ff; }
+  .move-cell.bg-brilliant  { background: rgba(38,198,218,0.14);  border-left: 3px solid #26c6da; }
+  .move-cell.bg-great      { background: rgba(91,192,235,0.13);  border-left: 3px solid #5bc0eb; }
+  .move-cell.bg-inaccuracy { background: rgba(248,195,80,0.13);  border-left: 3px solid #f8c350; }
+  .move-cell.bg-mistake    { background: rgba(240,165,0,0.15);   border-left: 3px solid #f0a500; }
+  .move-cell.bg-miss       { background: rgba(238,119,82,0.16);  border-left: 3px solid #ee7752; }
+  .move-cell.bg-blunder    { background: rgba(224,85,85,0.18);   border-left: 3px solid #e05555; }
 
   .move-ann { font-size: 0.82rem; font-weight: 800; flex-shrink: 0; }
 
@@ -430,10 +447,17 @@
     font-weight: 700;
     white-space: nowrap;
   }
-  .badge-best       { background: rgba(76,175,80,0.15);  color: #4caf50; }
-  .badge-inaccuracy { background: rgba(136,136,255,0.15); color: #8888ff; }
-  .badge-mistake    { background: rgba(240,165,0,0.15);  color: #f0a500; }
-  .badge-blunder    { background: rgba(224,85,85,0.15);  color: #e05555; }
+  .badge-brilliant  { background: rgba(38,198,218,0.18);  color: #26c6da; }
+  .badge-great      { background: rgba(91,192,235,0.18);  color: #5bc0eb; }
+  .badge-best       { background: rgba(76,175,80,0.18);   color: #4caf50; }
+  .badge-excellent  { background: rgba(139,195,74,0.18);  color: #8bc34a; }
+  .badge-good       { background: rgba(174,213,129,0.18); color: #aed581; }
+  .badge-book       { background: rgba(183,139,86,0.18);  color: #b78b56; }
+  .badge-forced     { background: rgba(154,160,166,0.18); color: #9aa0a6; }
+  .badge-inaccuracy { background: rgba(248,195,80,0.18);  color: #f8c350; }
+  .badge-mistake    { background: rgba(240,165,0,0.18);   color: #f0a500; }
+  .badge-miss       { background: rgba(238,119,82,0.18);  color: #ee7752; }
+  .badge-blunder    { background: rgba(224,85,85,0.18);   color: #e05555; }
 
   #placeholder {
     flex: 1;
@@ -468,9 +492,17 @@
   #summary-bar { display: none; }
   #summary-bar.visible { display: block; }
 
-  .blunder-sq   { background: rgba(224,85,85,0.4) !important; }
-  .mistake-sq   { background: rgba(240,165,0,0.4)  !important; }
-  .inaccuracy-sq{ background: rgba(136,136,255,0.4)!important; }
+  .brilliant-sq { background: rgba(38,198,218,0.45) !important; }
+  .great-sq     { background: rgba(91,192,235,0.45) !important; }
+  .best-sq      { background: rgba(76,175,80,0.45)  !important; }
+  .excellent-sq { background: rgba(139,195,74,0.40) !important; }
+  .good-sq      { background: rgba(174,213,129,0.35)!important; }
+  .book-sq      { background: rgba(183,139,86,0.35) !important; }
+  .forced-sq    { background: rgba(154,160,166,0.40)!important; }
+  .inaccuracy-sq{ background: rgba(248,195,80,0.45) !important; }
+  .mistake-sq   { background: rgba(240,165,0,0.45)  !important; }
+  .miss-sq      { background: rgba(238,119,82,0.45) !important; }
+  .blunder-sq   { background: rgba(224,85,85,0.45)  !important; }
 
   /* ── Back button (mobile only) ── */
   #back-btn-mobile {
@@ -616,12 +648,66 @@ import { Chess } from 'https://esm.sh/chess.js@1';
 const PIECE_URL = (color, type) =>
   `https://lichess1.org/assets/piece/cburnett/${color}${type.toUpperCase()}.svg`;
 
-const ANN_BLUNDER    = { label: '??', cls: 'ann-blunder',    sqCls: 'blunder-sq',    threshold: 200 };
-const ANN_MISTAKE    = { label: '?',  cls: 'ann-mistake',    sqCls: 'mistake-sq',    threshold: 100 };
-const ANN_INACCURACY = { label: '?!', cls: 'ann-inaccuracy', sqCls: 'inaccuracy-sq', threshold: 50  };
-const ANN_BEST       = { label: '★',  cls: 'ann-best',       sqCls: '',              threshold: -1  };
+const ANN_BRILLIANT  = { key: 'brilliant',  label: '!!', cls: 'ann-brilliant',  sqCls: 'brilliant-sq',  color: '#26c6da', name: 'Brilliant'  };
+const ANN_GREAT      = { key: 'great',      label: '!',  cls: 'ann-great',      sqCls: 'great-sq',      color: '#5bc0eb', name: 'Great'      };
+const ANN_BEST       = { key: 'best',       label: '★',  cls: 'ann-best',       sqCls: 'best-sq',       color: '#4caf50', name: 'Best'       };
+const ANN_EXCELLENT  = { key: 'excellent',  label: '✓',  cls: 'ann-excellent',  sqCls: 'excellent-sq',  color: '#8bc34a', name: 'Excellent'  };
+const ANN_GOOD       = { key: 'good',       label: '✓',  cls: 'ann-good',       sqCls: 'good-sq',       color: '#aed581', name: 'Good'       };
+const ANN_BOOK       = { key: 'book',       label: '📖', cls: 'ann-book',       sqCls: 'book-sq',       color: '#b78b56', name: 'Book'       };
+const ANN_FORCED     = { key: 'forced',     label: '↪',  cls: 'ann-forced',     sqCls: 'forced-sq',     color: '#9aa0a6', name: 'Forced'     };
+const ANN_INACCURACY = { key: 'inaccuracy', label: '?!', cls: 'ann-inaccuracy', sqCls: 'inaccuracy-sq', color: '#f8c350', name: 'Inaccuracy' };
+const ANN_MISTAKE    = { key: 'mistake',    label: '?',  cls: 'ann-mistake',    sqCls: 'mistake-sq',    color: '#f0a500', name: 'Mistake'    };
+const ANN_MISS       = { key: 'miss',       label: '✗',  cls: 'ann-miss',       sqCls: 'miss-sq',       color: '#ee7752', name: 'Miss'       };
+const ANN_BLUNDER    = { key: 'blunder',    label: '??', cls: 'ann-blunder',    sqCls: 'blunder-sq',    color: '#e05555', name: 'Blunder'    };
+
+const ALL_ANNS = [
+  ANN_BRILLIANT, ANN_GREAT, ANN_BEST, ANN_EXCELLENT, ANN_GOOD,
+  ANN_BOOK, ANN_FORCED, ANN_INACCURACY, ANN_MISTAKE, ANN_MISS, ANN_BLUNDER
+];
+
+const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 
 const ANALYSIS_DEPTH = 4;
+
+// Opening prefix table — first SAN tokens. Longest match wins.
+const OPENINGS = [
+  ['e4 e5 Nf3 Nc6 Bb5',           'Ruy López'],
+  ['e4 e5 Nf3 Nc6 Bc4 Bc5',       'Italian, Giuoco Piano'],
+  ['e4 e5 Nf3 Nc6 Bc4 Nf6',       'Italian, Two Knights'],
+  ['e4 e5 Nf3 Nc6 Bc4',           'Italian Game'],
+  ['e4 e5 Nf3 Nc6 d4',            'Scotch'],
+  ['e4 e5 Nf3 Nf6',               'Petrov'],
+  ['e4 e5 Nf3 d6',                'Philidor'],
+  ['e4 e5 f4',                    "King's Gambit"],
+  ['e4 e5 Nc3',                   'Vienna'],
+  ['e4 e5',                       'Open Game'],
+  ['e4 c5 Nf3 d6',                'Sicilian, Najdorf-bound'],
+  ['e4 c5 Nf3 Nc6',               'Sicilian, Open'],
+  ['e4 c5 Nc3',                   'Sicilian, Closed'],
+  ['e4 c5',                       'Sicilian'],
+  ['e4 e6',                       'French'],
+  ['e4 c6',                       'Caro-Kann'],
+  ['e4 d6',                       'Pirc'],
+  ['e4 Nf6',                      'Alekhine'],
+  ['e4 d5',                       'Scandinavian'],
+  ['e4 g6',                       'Modern'],
+  ['d4 d5 c4 e6',                 "Queen's Gambit Declined"],
+  ['d4 d5 c4 c6',                 'Slav'],
+  ['d4 d5 c4 dxc4',               "Queen's Gambit Accepted"],
+  ['d4 d5 c4',                    "Queen's Gambit"],
+  ['d4 Nf6 c4 e6 Nc3 Bb4',        'Nimzo-Indian'],
+  ['d4 Nf6 c4 g6',                "King's Indian / Grünfeld"],
+  ['d4 Nf6 c4',                   'Indian'],
+  ['d4 Nf6',                      'Indian Defense'],
+  ['d4 f5',                       'Dutch'],
+  ['d4 d5',                       'Closed Game'],
+  ['c4',                          'English'],
+  ['Nf3 d5',                      'Réti / KIA'],
+  ['Nf3',                         'Réti'],
+];
+
+// Max move index (in plies) we treat as still "book".
+const BOOK_MAX_PLY = 12;
 
 // ── State ────────────────────────────────────────────────────────────────────
 let currentGame = null;      // { fens, moves, evals, annotations, header }
@@ -778,21 +864,23 @@ async function analyseGame(fens, moves, isWhite, analysisId) {
 
   const evals = [];
   const bestMoves = [];
+  const secondScores = [];
   for (let i = 0; i < fens.length; i++) {
     if (analysisId !== currentAnalysisId) return; // cancelled — new game selected
 
     progressText.textContent = `Analysing position ${i} / ${fens.length - 1}…`;
     progressFill.style.width = `${(i / (fens.length - 1)) * 100}%`;
 
-    const { score, bestMove } = await getEval(fens[i]);
+    const { score, bestMove, secondScore } = await getEval(fens[i]);
     if (analysisId !== currentAnalysisId) return; // cancelled after await
 
     evals.push(score);
     bestMoves.push(bestMove);
+    secondScores.push(secondScore);
     currentGame.evals = evals;
     currentGame.bestMoves = bestMoves;
+    currentGame.secondScores = secondScores;
 
-    // Update eval bar as we go
     if (i === currentMoveIdx) setEvalBar(score);
   }
 
@@ -800,7 +888,7 @@ async function analyseGame(fens, moves, isWhite, analysisId) {
   progressFill.style.width = '100%';
 
   // Compute annotations
-  const annotations = computeAnnotations(evals, moves, bestMoves);
+  const annotations = computeAnnotations(evals, moves, bestMoves, secondScores, fens);
   currentGame.annotations = annotations;
 
   renderEvalGraph(evals, annotations);
@@ -810,17 +898,20 @@ async function analyseGame(fens, moves, isWhite, analysisId) {
 
 async function getEval(fen) {
   return new Promise(resolve => {
-    const timer = setTimeout(() => resolve({ score: 0, bestMove: '' }), 10000);
+    const timer = setTimeout(() => resolve({ score: 0, bestMove: '', secondScore: null }), 10000);
     const chess = new Chess();
-    try { chess.load(fen); } catch(e) { clearTimeout(timer); resolve({ score: 0, bestMove: '' }); return; }
-
-    // Check for game-over positions
-    if (chess.isCheckmate()) {
+    try { chess.load(fen); } catch(e) {
       clearTimeout(timer);
-      resolve({ score: chess.turn() === 'w' ? -90000 : 90000, bestMove: '' });
+      resolve({ score: 0, bestMove: '', secondScore: null });
       return;
     }
-    if (chess.isDraw()) { clearTimeout(timer); resolve({ score: 0, bestMove: '' }); return; }
+
+    if (chess.isCheckmate()) {
+      clearTimeout(timer);
+      resolve({ score: chess.turn() === 'w' ? -90000 : 90000, bestMove: '', secondScore: null });
+      return;
+    }
+    if (chess.isDraw()) { clearTimeout(timer); resolve({ score: 0, bestMove: '', secondScore: null }); return; }
 
     const pendingResolve = (result) => { clearTimeout(timer); resolve(result); };
     evalQueue.push({ fen, depth: ANALYSIS_DEPTH, resolve: pendingResolve });
@@ -839,11 +930,16 @@ evalWorker.onmessage = (e) => {
     document.getElementById('loading').style.display = 'none';
     return;
   }
-  if (e.data.type === 'eval' && pendingEvalResolve) {
+  if (e.data.type === 'multi' && pendingEvalResolve) {
     const r = pendingEvalResolve;
     pendingEvalResolve = null;
     evalBusy = false;
-    r({ score: e.data.score, bestMove: e.data.bestMove || '' });
+    r({
+      score: e.data.score,
+      bestMove: e.data.bestMove || '',
+      secondScore: e.data.secondScore,
+      secondMove: e.data.secondMove || '',
+    });
     drainEvalQueue();
   }
 };
@@ -879,32 +975,133 @@ function drainEvalQueue() {
   evalBusy = true;
   const { fen, depth, resolve } = evalQueue.shift();
   pendingEvalResolve = resolve;
-  evalWorker.postMessage({ fen, depth });
+  evalWorker.postMessage({ type: 'multi', fen, depth });
 }
 
 // ── Annotations ──────────────────────────────────────────────────────────────
-function computeAnnotations(evals, moves, bestMoves) {
+function computeAnnotations(evals, moves, bestMoves, secondScores, fens) {
   const annotations = [];
+  // Track running SAN sequence for book detection
+  const sanSoFar = [];
   for (let i = 0; i < moves.length; i++) {
+    sanSoFar.push(moves[i].san);
+
     const before = evals[i], after = evals[i + 1];
     if (before === undefined || after === undefined) { annotations.push(null); continue; }
 
-    const isWhiteMove = moves[i].color === 'w';
-    const cpLoss = isWhiteMove ? (before - after) : (after - before);
+    const mv          = moves[i];
+    const isWhiteMove = mv.color === 'w';
+    const sign        = isWhiteMove ? 1 : -1;
+    const evalBefore  = sign * before;       // player perspective
+    const evalAfter   = sign * after;
+    const cpLoss      = evalBefore - evalAfter;
 
-    let ann = null;
-    if      (cpLoss >= ANN_BLUNDER.threshold)    ann = ANN_BLUNDER;
-    else if (cpLoss >= ANN_MISTAKE.threshold)    ann = ANN_MISTAKE;
-    else if (cpLoss >= ANN_INACCURACY.threshold) ann = ANN_INACCURACY;
-    else if (cpLoss <= 10) {
-      // Best move: played move matches engine best OR nearly zero loss
-      const played = moves[i].from + moves[i].to + (moves[i].promotion || '');
-      const best   = (bestMoves && bestMoves[i]) || '';
-      if (!best || played === best || cpLoss <= 5) ann = ANN_BEST;
+    const playedUci = mv.from + mv.to + (mv.promotion || '');
+    const bestUci   = (bestMoves[i] || '').slice(0, 5);
+    const bestUciNorm = bestUci.length >= 4 ? bestUci : '';
+    const isBest    = bestUciNorm && (playedUci === bestUciNorm || playedUci.slice(0, 4) === bestUciNorm.slice(0, 4));
+
+    // Second-best score (player perspective): if engine returned one, else use a wide gap.
+    const second   = secondScores[i];
+    const secondPl = second != null ? sign * second : null;
+    const topGap   = secondPl != null ? (evalBefore - secondPl) : 0;
+
+    // Legal move count via chess.js on the FEN before the move
+    let legalCount = 99;
+    try {
+      const c = new Chess();
+      c.load(fens[i]);
+      legalCount = c.moves().length;
+    } catch {}
+
+    // Book detection: within first BOOK_MAX_PLY plies AND prefix matches opening table.
+    let isBook = false;
+    if (i < BOOK_MAX_PLY) {
+      const seq = sanSoFar.join(' ');
+      for (const [pref] of OPENINGS) {
+        if (seq === pref || seq.startsWith(pref + ' ') || pref.startsWith(seq)) {
+          isBook = true; break;
+        }
+      }
     }
+
+    // Sacrifice heuristic for Brilliant: the move moves into attack of a lower-valued
+    // piece (or undefended capture by lower-valued attacker), giving up material.
+    const sacrifice = isSacrifice(fens[i], mv);
+    // Was-winning detection for Miss
+    const wasWinning = evalBefore >= 200;
+    const stillWinning = evalAfter >= 100;
+
+    // Precedence: highest-priority classification wins.
+    let ann = null;
+    if (legalCount === 1) {
+      ann = ANN_FORCED;
+    } else if (isBook) {
+      ann = ANN_BOOK;
+    } else if (isBest && sacrifice && evalAfter >= -50) {
+      ann = ANN_BRILLIANT;
+    } else if (isBest && topGap >= 150 && secondPl != null && secondPl < evalBefore - 100) {
+      ann = ANN_GREAT;
+    } else if (isBest) {
+      ann = ANN_BEST;
+    } else if (cpLoss <= 10) {
+      ann = ANN_EXCELLENT;
+    } else if (wasWinning && !stillWinning && cpLoss >= 50) {
+      ann = ANN_MISS;
+    } else if (cpLoss <= 25) {
+      ann = ANN_GOOD;
+    } else if (cpLoss < 100) {
+      ann = ANN_INACCURACY;
+    } else if (cpLoss < 200) {
+      ann = ANN_MISTAKE;
+    } else {
+      ann = ANN_BLUNDER;
+    }
+
     annotations.push(ann);
   }
   return annotations;
+}
+
+// Returns true if the destination square is attacked by an opponent piece
+// of lower value than the moving piece — i.e. opponent can win material by recapture.
+function isSacrifice(fenBefore, mv) {
+  const c = new Chess();
+  try { c.load(fenBefore); } catch { return false; }
+  const movingPiece = c.get(mv.from);
+  if (!movingPiece) return false;
+  const movedVal = PIECE_VALUE[movingPiece.type] || 0;
+  if (movedVal === 0) return false; // king moves never count
+
+  // Apply the move to look at attackers from the opponent's side.
+  let after;
+  try {
+    after = new Chess(c.fen());
+    after.move({ from: mv.from, to: mv.to, promotion: mv.promotion || 'q' });
+  } catch { return false; }
+
+  // Captured value (if any).
+  const capturedVal = mv.captured ? (PIECE_VALUE[mv.captured] || 0) : 0;
+
+  // Find lowest-valued attacker of `mv.to` on the side that now moves.
+  const attackerSide = after.turn();
+  let lowestAttacker = Infinity;
+  const candidates = after.moves({ verbose: true });
+  for (const m of candidates) {
+    if (m.to !== mv.to) continue;
+    const piece = after.get(m.from);
+    if (!piece || piece.color !== attackerSide) continue;
+    const v = PIECE_VALUE[piece.type] || 0;
+    if (v && v < lowestAttacker) lowestAttacker = v;
+  }
+  if (lowestAttacker === Infinity) return false; // not attacked at all
+
+  // Material delta if opponent simply takes us:
+  //   we gained `capturedVal`, they will take `movedVal`, costing us `movedVal`.
+  // Net (player perspective) = capturedVal - movedVal.
+  // Counts as sacrifice when net <= -2 pawns AND the recapture is by a lower-valued piece.
+  const net = capturedVal - movedVal;
+  return net <= -2 && lowestAttacker < movedVal;
 }
 
 function winPct(cp) {
@@ -927,15 +1124,14 @@ function computeAccuracy(evals, moves, color) {
 }
 
 function countByCategory(annotations, moves, color) {
-  let best = 0, inaccuracy = 0, mistake = 0, blunder = 0;
+  const counts = {};
+  for (const a of ALL_ANNS) counts[a.key] = 0;
   annotations.forEach((ann, i) => {
+    if (!ann) return;
     if (moves[i].color !== color) return;
-    if (ann === ANN_BLUNDER)    blunder++;
-    else if (ann === ANN_MISTAKE)    mistake++;
-    else if (ann === ANN_INACCURACY) inaccuracy++;
-    else if (ann === ANN_BEST)       best++;
+    counts[ann.key] = (counts[ann.key] || 0) + 1;
   });
-  return { best, inaccuracy, mistake, blunder };
+  return counts;
 }
 
 function renderEvalGraph(evals, annotations) {
@@ -975,13 +1171,14 @@ function renderEvalGraph(evals, annotations) {
   pl.setAttribute('fill', 'none'); pl.setAttribute('stroke', '#c8c8c8'); pl.setAttribute('stroke-width', '1.5');
   svg.appendChild(pl);
 
-  // Annotation dots
+  // Annotation dots — only mark notable categories (skip best/excellent/good/book/forced).
+  const NOTABLE = new Set([ANN_BRILLIANT, ANN_GREAT, ANN_INACCURACY, ANN_MISTAKE, ANN_MISS, ANN_BLUNDER]);
   annotations.forEach((ann, i) => {
-    if (!ann || ann === ANN_BEST) return;
+    if (!ann || !NOTABLE.has(ann)) return;
     const p = pts[i + 1]; if (!p) return;
     const dot = document.createElementNS(ns, 'circle');
     dot.setAttribute('cx', p.x); dot.setAttribute('cy', p.y); dot.setAttribute('r', '3');
-    dot.setAttribute('fill', ann === ANN_BLUNDER ? '#e05555' : ann === ANN_MISTAKE ? '#f0a500' : '#8888ff');
+    dot.setAttribute('fill', ann.color);
     svg.appendChild(dot);
   });
 
@@ -1161,10 +1358,10 @@ function goToMove(idx) {
 
   // Draw best-move arrow for annotated moves
   const svg = document.getElementById('board-arrows');
-  if (svg && ann && idx > 0 && currentGame.bestMoves[idx - 1]) {
+  const NEEDS_ARROW = new Set([ANN_BRILLIANT, ANN_GREAT, ANN_INACCURACY, ANN_MISTAKE, ANN_MISS, ANN_BLUNDER]);
+  if (svg && ann && NEEDS_ARROW.has(ann) && idx > 0 && currentGame.bestMoves[idx - 1]) {
     const uci   = currentGame.bestMoves[idx - 1];
-    const color = ann === ANN_BLUNDER ? '#e05555' : ann === ANN_MISTAKE ? '#f0a500' : '#8888ff';
-    drawArrow(svg, uci.slice(0, 2), uci.slice(2, 4), color);
+    drawArrow(svg, uci.slice(0, 2), uci.slice(2, 4), ann.color);
   } else if (svg) {
     svg.innerHTML = '';
   }
@@ -1191,8 +1388,7 @@ function renderBoard(fen, lastMove, ann) {
           if (ann.sqCls) div.classList.add(ann.sqCls);
           else div.classList.add('last-move');
           // Annotation symbol overlay
-          const sqClass = ann === ANN_BLUNDER ? 'sq-ann-blunder' : ann === ANN_MISTAKE ? 'sq-ann-mistake' : ann === ANN_INACCURACY ? 'sq-ann-inaccuracy' : 'sq-ann-best';
-          div.classList.add('annotated', sqClass);
+          div.classList.add('annotated', 'sq-ann-' + ann.key);
           div.dataset.ann = ann.label;
         } else {
           div.classList.add('last-move');
@@ -1289,7 +1485,8 @@ function renderMoveList(moves, evals, annotations) {
       const ann  = annotations[mi];
       const cp   = evals[mi + 1];
       const cell = document.createElement('span');
-      const bgCls = ann === ANN_BLUNDER ? 'bg-blunder' : ann === ANN_MISTAKE ? 'bg-mistake' : ann === ANN_INACCURACY ? 'bg-inaccuracy' : ann === ANN_BEST ? '' : '';
+      const SHADED = new Set(['brilliant','great','inaccuracy','mistake','miss','blunder']);
+      const bgCls = (ann && SHADED.has(ann.key)) ? 'bg-' + ann.key : '';
       cell.className = 'move-cell' + (bgCls ? ' ' + bgCls : '');
       cell.dataset.idx = mi + 1;
 
@@ -1353,6 +1550,12 @@ function renderSummary(evals, moves, annotations) {
   const wC = countByCategory(annotations, moves, 'w');
   const bC = countByCategory(annotations, moves, 'b');
 
+  const rows = ALL_ANNS.map(a =>
+    `<tr><td>${wC[a.key] || 0}</td>
+         <td><span class="badge badge-${a.key}">${a.label} ${a.name}</span></td>
+         <td>${bC[a.key] || 0}</td></tr>`
+  ).join('');
+
   bar.innerHTML = `
     <div id="accuracy-section">
       <div class="acc-label">Accuracies</div>
@@ -1369,12 +1572,7 @@ function renderSummary(evals, moves, annotations) {
     </div>
     <table class="class-table">
       <thead><tr><th>${wName}</th><th></th><th>${bName}</th></tr></thead>
-      <tbody>
-        <tr><td>${wC.best}</td>      <td><span class="badge badge-best">★ Best</span></td>           <td>${bC.best}</td></tr>
-        <tr><td>${wC.inaccuracy}</td><td><span class="badge badge-inaccuracy">?! Inaccuracy</span></td><td>${bC.inaccuracy}</td></tr>
-        <tr><td>${wC.mistake}</td>   <td><span class="badge badge-mistake">? Mistake</span></td>     <td>${bC.mistake}</td></tr>
-        <tr><td>${wC.blunder}</td>   <td><span class="badge badge-blunder">?? Blunder</span></td>    <td>${bC.blunder}</td></tr>
-      </tbody>
+      <tbody>${rows}</tbody>
     </table>
   `;
   bar.classList.add('visible');
