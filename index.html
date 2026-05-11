@@ -1130,6 +1130,7 @@ async function triggerEngineMove() {
   if (clock.enabled) startClock();
 
   const plan = eloPlan(elo);
+  const startedAt = performance.now();
 
   let uciMove;
   if (Math.random() < plan.randomRate) {
@@ -1143,6 +1144,14 @@ async function triggerEngineMove() {
     if (plan.timeMs > 0) uciMove = await engineMoveTime(chess.fen(), plan.timeMs);
     else                 uciMove = await engineMoveDepth(chess.fen(), plan.depth);
   }
+
+  // Realistic think delay — engine often returns near-instant at low depths,
+  // so floor the visible think time. Clock keeps ticking on engine side here.
+  const minThink = Math.max(plan.timeMs, 350);
+  const target   = minThink + Math.random() * 600;
+  const wait     = target - (performance.now() - startedAt);
+  if (wait > 0) await new Promise(r => setTimeout(r, wait));
+
   thinking = false;
 
   if (uciMove && uciMove.length >= 4 && uciMove.slice(0,2) !== uciMove.slice(2,4)) {
