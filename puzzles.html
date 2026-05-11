@@ -310,10 +310,30 @@ function dateSeed() {
 }
 function puzzleSeed() { return dateSeed() + puzzleOffset * 1000003; }
 
+// Preload piece SVGs so the first paint shows pieces, not empty squares.
+const PIECE_PRELOAD = (() => {
+  const promises = [];
+  for (const c of ['w', 'b']) {
+    for (const t of ['p', 'n', 'b', 'r', 'q', 'k']) {
+      promises.push(new Promise(res => {
+        const img = new Image();
+        img.onload = img.onerror = () => res();
+        img.src = PIECE_URL(c, t);
+      }));
+    }
+  }
+  return Promise.all(promises);
+})();
+
+// Paint an empty board immediately so axes wrap a real board during load,
+// not a 0-height collapsed container.
+renderEmptyBoard();
+
 // ── Worker ────────────────────────────────────────────────────────────────────
 const worker = new Worker('./puzzle_worker.js', { type: 'module' });
-worker.onmessage = (e) => {
+worker.onmessage = async (e) => {
   if (e.data.type === 'ready') {
+    await PIECE_PRELOAD;
     document.getElementById('loading').style.display = 'none';
     loadPuzzle();
   }

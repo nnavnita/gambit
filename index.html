@@ -548,14 +548,13 @@ const PIECE_URL = (color, type) =>
 // ── Worker ─────────────────────────────────────────────────────────────────
 const worker = new Worker('./worker.js', { type: 'module' });
 
-worker.onmessage = (e) => {
+let engineReady = false;
+worker.onmessage = async (e) => {
   const d = e.data;
   if (d.type === 'ready') {
+    engineReady = true;
+    await PIECE_PRELOAD;
     document.getElementById('loading').style.display = 'none';
-    applyTheme(theme);
-    updateColorButtons();
-    setEloLabel();
-    renderBoard();
     updateStatus();
     refreshEval();
   }
@@ -580,6 +579,22 @@ worker.onmessage = (e) => {
     el.textContent = 'Engine failed to load: ' + d.message;
   }
 };
+
+// Preload piece SVGs so the board paint doesn't flash empty squares
+// the first time renderBoard runs.
+const PIECE_PRELOAD = (() => {
+  const promises = [];
+  for (const c of ['w', 'b']) {
+    for (const t of ['p', 'n', 'b', 'r', 'q', 'k']) {
+      promises.push(new Promise(res => {
+        const img = new Image();
+        img.onload = img.onerror = () => res();
+        img.src = PIECE_URL(c, t);
+      }));
+    }
+  }
+  return Promise.all(promises);
+})();
 
 worker.onerror = (e) => {
   console.error('Engine worker crashed:', e.message || '(no message)');
@@ -1449,6 +1464,13 @@ function playCheckSound()    { if (!soundOn) return; try { const c=getAudioCtx()
 function playGameOverSound() { if (!soundOn) return; try { const c=getAudioCtx(),t=c.currentTime; noise(c,t,0.05,0.45,600,350); noise(c,t+0.05,0.08,0.2,350,200); } catch {} }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+// Paint the board immediately so axes/eval-bar wrap a fully-rendered board
+// even before the engine worker reports ready. Loader stays on top until then.
+applyTheme(theme);
+updateColorButtons();
+setEloLabel();
+renderBoard();
+
 function fileChar(n) { return 'abcdefgh'[n - 1]; }
 function kingSquare(color) {
   for (const f of 'abcdefgh') for (const r of '12345678') {
