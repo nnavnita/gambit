@@ -718,6 +718,47 @@ let currentAnalysisId = 0;   // incremented each time a new game is loaded
 // ── Init ─────────────────────────────────────────────────────────────────────
 populateDateSelectors();
 
+// ── Pending game handoff from Play page ──────────────────────────────────────
+let pendingGameConsumed = false;
+function tryLoadPendingGame() {
+  if (pendingGameConsumed) return;
+  let raw;
+  try { raw = sessionStorage.getItem('gambit_pending_game'); } catch { return; }
+  if (!raw) return;
+  let payload;
+  try { payload = JSON.parse(raw); } catch { sessionStorage.removeItem('gambit_pending_game'); return; }
+  try { sessionStorage.removeItem('gambit_pending_game'); } catch {}
+  pendingGameConsumed = true;
+
+  // Build a chess.com-shaped gameData and a 1-item list so the UI feels normal
+  const gameData = {
+    pgn: payload.pgn,
+    white: payload.white || { username: 'White', rating: null },
+    black: payload.black || { username: 'Black', rating: null },
+    time_class: payload.time_class || 'rapid',
+    time_control: payload.time_control || '-',
+    end_time: payload.end_time || Math.floor(Date.now() / 1000),
+    rules: 'chess',
+  };
+  const username = (payload.youAreWhite ? gameData.white.username : gameData.black.username).toLowerCase();
+  analysisUsername = username;
+
+  const list = document.getElementById('game-list');
+  if (list) {
+    list.innerHTML = '<div id="game-list-header">Your Game</div>';
+    const div = document.createElement('div');
+    div.className = 'game-item selected';
+    const opp = payload.youAreWhite ? gameData.black : gameData.white;
+    div.innerHTML = `
+      <span class="game-opponent">vs ${opp.username}</span>
+      <span class="game-meta">Just finished</span>
+    `;
+    list.appendChild(div);
+  }
+
+  loadGame(gameData, username);
+}
+
 // ── Date selectors ───────────────────────────────────────────────────────────
 function populateDateSelectors() {
   const now = new Date();
@@ -928,6 +969,7 @@ const evalWorker = new Worker('./eval_worker.js', { type: 'module' });
 evalWorker.onmessage = (e) => {
   if (e.data.type === 'ready') {
     document.getElementById('loading').style.display = 'none';
+    tryLoadPendingGame();
     return;
   }
   if (e.data.type === 'multi' && pendingEvalResolve) {

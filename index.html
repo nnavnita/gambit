@@ -456,6 +456,13 @@
       <div id="score-white" class="score-row" style="display:none;"></div>
     </div>
 
+    <div class="panel" id="game-over-panel" style="display:none;">
+      <div class="panel-title">Game Over</div>
+      <div id="game-over-result" style="font-size:0.78rem;color:#aaa;margin-bottom:8px;"></div>
+      <button id="btn-analyze-game" style="font-size:0.85rem;width:100%;padding:9px;margin-bottom:6px;background:#4caf50;color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600;">📊 Analyze Game</button>
+      <button id="btn-download-game" class="secondary" style="font-size:0.78rem;width:100%;padding:7px;">⬇ Download PGN</button>
+    </div>
+
     <div class="panel controls">
       <button id="btn-new">New Game</button>
       <div>
@@ -487,12 +494,19 @@
         <div style="font-size:0.7rem;color:#888;margin-top:6px;line-height:1.4;">Share generated link. Both must keep tab open.</div>
       </div>
       <div id="mp-hosting" style="display:none;">
-        <div style="font-size:0.72rem;color:#aaa;margin-bottom:6px;">Send this link to your friend:</div>
+        <div style="font-size:0.72rem;color:#aaa;margin-bottom:4px;">Your name (optional):</div>
+        <input id="mp-host-name" placeholder="e.g. Navnita" maxlength="32" style="width:100%;padding:6px;font-size:0.75rem;background:#0a0a14;color:var(--text);border:1px solid var(--line);border-radius:4px;margin-bottom:8px;">
+        <div style="font-size:0.72rem;color:#aaa;margin-bottom:4px;">Opponent's name (optional):</div>
+        <input id="mp-guest-name" placeholder="e.g. Sarthak" maxlength="32" style="width:100%;padding:6px;font-size:0.75rem;background:#0a0a14;color:var(--text);border:1px solid var(--line);border-radius:4px;margin-bottom:8px;">
+        <div style="font-size:0.72rem;color:#aaa;margin-bottom:4px;">Invite link:</div>
         <input id="mp-link" readonly style="width:100%;padding:6px;font-size:0.7rem;background:#0a0a14;color:var(--text);border:1px solid var(--line);border-radius:4px;">
+        <div style="font-size:0.72rem;color:#aaa;margin:8px 0 4px;">Share message:</div>
+        <textarea id="mp-share-msg" readonly rows="3" style="width:100%;padding:6px;font-size:0.7rem;background:#0a0a14;color:var(--text);border:1px solid var(--line);border-radius:4px;resize:vertical;font-family:inherit;line-height:1.4;"></textarea>
         <div style="display:flex;gap:6px;margin-top:6px;">
           <button id="btn-mp-copy" class="secondary" style="flex:1;font-size:0.72rem;padding:6px;">Copy Link</button>
-          <button id="btn-mp-cancel" class="secondary" style="flex:1;font-size:0.72rem;padding:6px;">Cancel</button>
+          <button id="btn-mp-copy-msg" class="secondary" style="flex:1;font-size:0.72rem;padding:6px;">Copy Message</button>
         </div>
+        <button id="btn-mp-cancel" class="secondary" style="width:100%;font-size:0.72rem;padding:6px;margin-top:6px;">Cancel</button>
         <div id="mp-status" style="font-size:0.72rem;color:#f0a500;margin-top:6px;">Waiting for opponent…</div>
       </div>
       <div id="mp-connected" style="display:none;">
@@ -833,15 +847,83 @@ document.getElementById('btn-resign').onclick = () => {
   if (mp) { mpSend({ type: 'resign' }); mpSaveSession(); mpUpdateRematchUI(); }
 };
 
-document.getElementById('btn-export-pgn').onclick = () => {
-  const pgn = chess.pgn({ maxWidth: 80, newline: '\n' });
-  const blob = new Blob([pgn], { type: 'text/plain' });
+function buildGameHeaders() {
+  const whiteName = mp
+    ? (playerColor === 'w' ? 'You' : 'Opponent')
+    : (playerColor === 'w' ? 'You' : `Gambit ${elo}`);
+  const blackName = mp
+    ? (playerColor === 'b' ? 'You' : 'Opponent')
+    : (playerColor === 'b' ? 'You' : `Gambit ${elo}`);
+  let result = '*';
+  if (chess.isCheckmate()) {
+    result = chess.turn() === 'w' ? '0-1' : '1-0';
+  } else if (resigned) {
+    result = resigned === 'w' ? '0-1' : '1-0';
+  } else if (clock.enabled && (clock.white === 0 || clock.black === 0)) {
+    result = clock.white === 0 ? '0-1' : '1-0';
+  } else if (chess.isDraw()) {
+    result = '1/2-1/2';
+  }
+  return {
+    Event: mp ? 'Gambit Multiplayer' : 'Gambit vs Engine',
+    Site: 'Gambit',
+    Date: new Date().toISOString().slice(0,10).replace(/-/g,'.'),
+    White: whiteName,
+    Black: blackName,
+    Result: result,
+  };
+}
+
+function buildAnnotatedPgn() {
+  const h = buildGameHeaders();
+  const headerLines = Object.entries(h).map(([k,v]) => `[${k} "${v}"]`).join('\n');
+  const body = chess.pgn({ maxWidth: 80, newline: '\n' });
+  // chess.pgn() may already include some headers; strip them and rebuild.
+  const bodyOnly = body.replace(/^(\[[^\]]+\]\s*\n)+/, '').trimStart();
+  const moveText = bodyOnly || '*';
+  // Ensure result token at end
+  const ends = /\s(1-0|0-1|1\/2-1\/2|\*)\s*$/.test(moveText);
+  const finalText = ends ? moveText : `${moveText} ${h.Result}`;
+  return `${headerLines}\n\n${finalText}\n`;
+}
+
+function downloadCurrentPgn() {
+  const pgn = buildAnnotatedPgn();
+  const blob = new Blob([pgn], { type: 'application/x-chess-pgn' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = `gambit-${new Date().toISOString().slice(0,10)}.pgn`;
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
+}
+
+document.getElementById('btn-export-pgn').onclick = downloadCurrentPgn;
+document.getElementById('btn-download-game').onclick = downloadCurrentPgn;
+
+document.getElementById('btn-analyze-game').onclick = () => {
+  const h = buildGameHeaders();
+  const pgn = buildAnnotatedPgn();
+  const youAreWhite = mp
+    ? playerColor === 'w'
+    : playerColor === 'w';
+  const payload = {
+    pgn,
+    white: { username: h.White, rating: null },
+    black: { username: h.Black, rating: null },
+    youAreWhite,
+    youUsername: 'You',
+    time_class: 'rapid',
+    time_control: '-',
+    end_time: Math.floor(Date.now() / 1000),
+    rules: 'chess',
+  };
+  try {
+    sessionStorage.setItem('gambit_pending_game', JSON.stringify(payload));
+  } catch (e) {
+    console.error('Could not stash game for analysis:', e);
+  }
+  window.location.href = 'analysis.html';
 };
 
 // ── Multiplayer (PeerJS) ───────────────────────────────────────────────────
@@ -865,6 +947,38 @@ let mpRematchInbound = false;
 function mpGenRoomId() {
   // 8 char alphanumeric — collision-resistant for casual use
   return Math.random().toString(36).slice(2, 10);
+}
+
+function mpFormatTcLabel(tcValue) {
+  if (!tcValue || tcValue === '0') return 'an untimed';
+  const [secStr, incStr] = String(tcValue).split('+');
+  const sec = parseInt(secStr) || 0;
+  const inc = parseInt(incStr) || 0;
+  const mins = sec / 60;
+  const minLabel = Number.isInteger(mins) ? mins : mins.toFixed(1);
+  return inc > 0 ? `a ${minLabel}+${inc}` : `a ${minLabel}-min`;
+}
+
+function mpBuildShareMessage() {
+  const hostEl  = document.getElementById('mp-host-name');
+  const guestEl = document.getElementById('mp-guest-name');
+  const linkEl  = document.getElementById('mp-link');
+  const tcEl    = document.getElementById('tc-select');
+  if (!hostEl || !guestEl || !linkEl || !tcEl) return '';
+  const hostName  = (hostEl.value  || '').trim();
+  const guestName = (guestEl.value || '').trim();
+  const link = linkEl.value || '';
+  const tcLabel = mpFormatTcLabel(tcEl.value);
+  const guestColor = playerColor === 'w' ? 'Black' : 'White';
+  const subject = hostName ? `${hostName} wants` : 'Someone wants';
+  const greeting = guestName ? `Hi ${guestName}! ` : '';
+  return `${greeting}${subject} to invite you to ${tcLabel} game of chess on Gambit! Click this link to play as ${guestColor}: ${link}`;
+}
+
+function mpRefreshShareMessage() {
+  const msgEl = document.getElementById('mp-share-msg');
+  if (!msgEl) return;
+  msgEl.value = mpBuildShareMessage();
 }
 
 function mpShowPanel(state) {
@@ -992,13 +1106,23 @@ function mpStartHost(opts = {}) {
     mpShowPanel('hosting');
     document.getElementById('mp-link').value = mpInviteLink(roomId);
     document.getElementById('mp-status').textContent = 'Waiting for opponent…';
+    const savedHost  = localStorage.getItem('gambit_host_name') || '';
+    const savedGuest = localStorage.getItem('gambit_guest_name') || '';
+    const hostEl  = document.getElementById('mp-host-name');
+    const guestEl = document.getElementById('mp-guest-name');
+    if (hostEl)  hostEl.value  = savedHost;
+    if (guestEl) guestEl.value = savedGuest;
+    mpRefreshShareMessage();
   }
 
   const peer = new Peer(roomId, PEER_OPTS);
   mp = { role: 'host', peer, conn: null, roomId, established: !!opts.resume, retryCount: opts.retryCount || 0 };
 
   peer.on('open', (id) => {
-    if (!opts.resume) document.getElementById('mp-link').value = mpInviteLink(id);
+    if (!opts.resume) {
+      document.getElementById('mp-link').value = mpInviteLink(id);
+      mpRefreshShareMessage();
+    }
   });
   peer.on('connection', (conn) => {
     if (mp.conn && mp.conn.open) { conn.close(); return; }
@@ -1276,6 +1400,20 @@ document.getElementById('btn-mp-copy').onclick = async () => {
   try { await navigator.clipboard.writeText(link); flashStatus('Link copied'); }
   catch { document.getElementById('mp-link').select(); }
 };
+document.getElementById('btn-mp-copy-msg').onclick = async () => {
+  const msg = mpBuildShareMessage();
+  try { await navigator.clipboard.writeText(msg); flashStatus('Message copied'); }
+  catch { document.getElementById('mp-share-msg').select(); }
+};
+document.getElementById('mp-host-name').addEventListener('input', (e) => {
+  localStorage.setItem('gambit_host_name', e.target.value.trim());
+  mpRefreshShareMessage();
+});
+document.getElementById('mp-guest-name').addEventListener('input', (e) => {
+  localStorage.setItem('gambit_guest_name', e.target.value.trim());
+  mpRefreshShareMessage();
+});
+document.getElementById('tc-select').addEventListener('change', mpRefreshShareMessage);
 document.getElementById('btn-mp-rematch').onclick = mpRequestRematch;
 
 // Save session on tab close
@@ -1806,7 +1944,33 @@ function fillScoreRow(id, pieces, color, adv, winning) {
 }
 
 // ── Status ─────────────────────────────────────────────────────────────────
+function updateGameOverPanel() {
+  const panel = document.getElementById('game-over-panel');
+  if (!panel) return;
+  const flagged = clock.enabled && (clock.white === 0 || clock.black === 0);
+  const over = chess.isGameOver() || !!resigned || flagged;
+  if (!over) {
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = '';
+  const sub = document.getElementById('game-over-result');
+  let txt = 'Game over';
+  if (chess.isCheckmate()) {
+    txt = (chess.turn() === 'w' ? 'Black' : 'White') + ' wins by checkmate';
+  } else if (resigned) {
+    txt = (resigned === 'w' ? 'White' : 'Black') + ' resigned';
+  } else if (flagged) {
+    txt = (clock.white === 0 ? 'White' : 'Black') + ' flagged';
+  } else if (chess.isStalemate())               txt = 'Draw — stalemate';
+  else if (chess.isThreefoldRepetition())       txt = 'Draw — threefold repetition';
+  else if (chess.isInsufficientMaterial())      txt = 'Draw — insufficient material';
+  else if (chess.isDraw())                      txt = 'Draw';
+  if (sub) sub.textContent = txt;
+}
+
 function updateStatus() {
+  updateGameOverPanel();
   const el = document.getElementById('status-text');
   el.className = '';
 
